@@ -554,6 +554,64 @@
       margin-top: 2px;
     }
 
+    /* ── 리스트 화면 ── */
+    .list-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 11px 4px;
+      border-bottom: 1px solid #f5f5f5;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.1s;
+    }
+    .list-item:hover { background: #f0faf5; }
+    .list-item:last-child { border-bottom: none; }
+    .list-item-icon { font-size: 18px; line-height: 1; margin-top: 2px; flex-shrink: 0; }
+    .list-item-addr { font-size: 13px; font-weight: 600; color: #222; line-height: 1.4; }
+    .list-item-sub  { font-size: 11px; color: #999; margin-top: 2px; }
+
+    /* ── 로드뷰 버튼 ── */
+    .roadview-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 10px 14px;
+      background: #FFEB3B;
+      color: #333;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.15s;
+      margin-bottom: 14px;
+    }
+    .roadview-btn:hover { background: #FDD835; }
+
+    /* ── 지도 대시보드 ── */
+    #map-dashboard {
+      position: fixed;
+      bottom: 70px;
+      left: 10px;
+      z-index: 400;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+      border: 1px solid rgba(0,0,0,0.06);
+      pointer-events: none;
+    }
+    .dash-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+    .dash-num  { font-size: 15px; font-weight: 800; color: #1a1a1a; line-height: 1; }
+    .dash-label { font-size: 10px; color: #888; }
+    .dash-sep  { color: #ddd; font-size: 18px; font-weight: 300; }
+
     /* 모바일 */
     @media (max-width: 680px) {
       :root { --panel-w: 0px; }
@@ -581,6 +639,29 @@
 
 <!-- 지도 -->
 <div id="map"></div>
+
+<!-- 지도 위 대시보드 -->
+<div id="map-dashboard">
+  <div class="dash-item">
+    <span class="dash-num" id="dash-total">-</span>
+    <span class="dash-label">전체</span>
+  </div>
+  <div class="dash-sep">|</div>
+  <div class="dash-item">
+    <span class="dash-num" id="dash-visible">-</span>
+    <span class="dash-label">현재 화면</span>
+  </div>
+  <div class="dash-sep">|</div>
+  <div class="dash-item">
+    <span class="dash-num" id="dash-gangnam" style="color:#2e7d52">-</span>
+    <span class="dash-label">강남구</span>
+  </div>
+  <div class="dash-sep">|</div>
+  <div class="dash-item">
+    <span class="dash-num" id="dash-songpa" style="color:#1565C0">-</span>
+    <span class="dash-label">송파구</span>
+  </div>
+</div>
 
 <!-- 패널 접기/펼치기 버튼 -->
 <button id="panel-toggle" title="패널 접기/펼치기">▶</button>
@@ -640,6 +721,13 @@
       </div>
     </div>
 
+    <!-- 리스트 화면 -->
+    <div id="view-list" style="display:none;">
+      <button class="detail-back" id="list-back">← 전체 목록으로</button>
+      <div class="section-title" id="list-title">이 위치의 쓰레기통</div>
+      <div id="list-items"></div>
+    </div>
+
     <!-- 상세 화면 -->
     <div id="view-detail">
       <button class="detail-back" id="detail-back">
@@ -656,6 +744,12 @@
 
       <div id="detail-dist-wrap" style="display:none">
         <span class="detail-dist-badge" id="detail-dist">-</span>
+      </div>
+
+      <div id="detail-roadview-wrap" style="display:none; margin-top:4px;">
+        <a id="detail-roadview-link" href="#" target="_blank" rel="noopener" class="roadview-btn">
+          🛣️ 카카오 로드뷰로 보기
+        </a>
       </div>
 
       <div class="detail-fields" id="detail-fields"></div>
@@ -745,6 +839,7 @@
   let nearestItem      = null;
   let nearestMarkerRef = null;
   let latField = null, lonField = null, addrField = null;
+  let listContext      = null;  // { items, title } — 리스트→상세 뒤로가기용
 
   // 줌 < DONG_THRESHOLD → 동 버블 / 줌 >= DONG_THRESHOLD → 개별 핀
   const DONG_THRESHOLD = 14;
@@ -826,9 +921,48 @@
     return m < 1000 ? `${Math.round(m)}m` : `${(m/1000).toFixed(1)}km`;
   }
 
-  // ── 상세 패널 열기 ────────────────────────────────────
-  function showDetail(item) {
+  // ── 패널 자동 펼치기 ─────────────────────────────────
+  function expandPanel() {
+    if (document.body.classList.contains('panel-collapsed')) {
+      document.body.classList.remove('panel-collapsed');
+      panelToggleBtn.textContent = '▶';
+      setTimeout(() => map.invalidateSize(), 360);
+    }
+  }
+
+  // ── 리스트 화면 표시 ─────────────────────────────────
+  function showList(items, title) {
+    listContext = { items, title };
     document.getElementById('view-default').style.display = 'none';
+    document.getElementById('view-detail').style.display  = 'none';
+    document.getElementById('view-list').style.display    = 'block';
+    document.getElementById('list-title').textContent = `${title} (${items.length}개)`;
+
+    const container = document.getElementById('list-items');
+    container.innerHTML = '';
+    for (const item of items) {
+      const src  = item._src;
+      const addr = item[src.addrField] || '위치 정보 없음';
+      const div  = document.createElement('div');
+      div.className = 'list-item';
+      div.innerHTML = `
+        <div class="list-item-icon" style="color:${src.color}">🗑️</div>
+        <div>
+          <div class="list-item-addr">${addr}</div>
+          <div class="list-item-sub">${src.name}</div>
+        </div>`;
+      div.addEventListener('click', () => showDetail(item, true));
+      container.appendChild(div);
+    }
+  }
+
+  document.getElementById('list-back').addEventListener('click', showDefault);
+
+  // ── 상세 패널 열기 ────────────────────────────────────
+  function showDetail(item, fromList = false) {
+    if (!fromList) listContext = null;
+    document.getElementById('view-default').style.display = 'none';
+    document.getElementById('view-list').style.display    = 'none';
     document.getElementById('view-detail').style.display  = 'block';
 
     const src  = item._src;
@@ -865,14 +999,32 @@
       row.innerHTML = `<span class="field-key">좌표</span><span class="field-val">${lat.toFixed(6)}, ${lon.toFixed(6)}</span>`;
       container.appendChild(row);
     }
+
+    // 로드뷰
+    const rwWrap = document.getElementById('detail-roadview-wrap');
+    const rwLink = document.getElementById('detail-roadview-link');
+    if (!isNaN(lat) && !isNaN(lon)) {
+      rwLink.href = `https://map.kakao.com/link/roadview/${lat},${lon}`;
+      rwWrap.style.display = 'block';
+    } else {
+      rwWrap.style.display = 'none';
+    }
   }
 
   function showDefault() {
+    listContext = null;
     document.getElementById('view-default').style.display = 'block';
     document.getElementById('view-detail').style.display  = 'none';
+    document.getElementById('view-list').style.display    = 'none';
   }
 
-  document.getElementById('detail-back').addEventListener('click', showDefault);
+  document.getElementById('detail-back').addEventListener('click', () => {
+    if (listContext) {
+      showList(listContext.items, listContext.title);
+    } else {
+      showDefault();
+    }
+  });
 
   // ── 동 단위 집계 레이어 생성 ────────────────────────
   function buildDongLayer() {
@@ -945,6 +1097,7 @@
       maxClusterRadius: 50,
       showCoverageOnHover: false,
       spiderfyOnMaxZoom: true,
+      zoomToBoundsOnClick: false,
       iconCreateFunction(cluster) {
         const n = cluster.getChildCount();
         const sz = n < 10 ? 36 : n < 100 ? 42 : 48;
@@ -980,13 +1133,29 @@
       });
 
       marker.on('click', () => {
+        expandPanel();
         showDetail(item);
         map.panTo([lat, lon], { animate: true, duration: 0.5 });
       });
 
+      marker._trashItem = item;
       markerCluster.addLayer(marker);
       if (isHighlight) nearestMarkerRef = marker;
     }
+
+    // 클러스터 클릭 → 리스트 표시
+    markerCluster.on('clusterclick', (e) => {
+      const markers = e.layer.getAllChildMarkers();
+      const items   = markers.map(m => m._trashItem).filter(Boolean);
+      if (items.length > 0) {
+        if (items.length <= 20) {
+          expandPanel();
+          showList(items, '이 위치의 쓰레기통');
+        } else {
+          e.layer.zoomToBounds({ padding: [20, 20] });
+        }
+      }
+    });
 
     // 레이어 추가는 updateLayers()가 줌 상태에 따라 결정
     updateLayers();
@@ -1075,6 +1244,7 @@
 
       try { buildDongLayer(); } catch(e) { console.error('buildDongLayer 오류:', e); }
       try { renderMarkers();  } catch(e) { console.error('renderMarkers 오류:', e); }
+      updateDashboard();
       showLocationModal();
 
     } catch (err) {
@@ -1122,6 +1292,28 @@
 
   // 패널의 내 위치 버튼은 모달 없이 바로 요청
   document.getElementById('locate-btn').addEventListener('click', requestLocation);
+
+  // ── 지도 대시보드 업데이트 ──────────────────────────
+  function updateDashboard() {
+    if (allData.length === 0) return;
+    const bounds = map.getBounds();
+    let visGangnam = 0, visSongpa = 0;
+    for (const d of allData) {
+      const lat = parseFloat(d[d._src.latField]);
+      const lon = parseFloat(d[d._src.lonField]);
+      if (isNaN(lat) || isNaN(lon)) continue;
+      if (!bounds.contains([lat, lon])) continue;
+      if (d._src.name === '강남구') visGangnam++;
+      else visSongpa++;
+    }
+    const visTotal = visGangnam + visSongpa;
+    document.getElementById('dash-total').textContent   = allData.length.toLocaleString();
+    document.getElementById('dash-visible').textContent = visTotal.toLocaleString();
+    document.getElementById('dash-gangnam').textContent = visGangnam.toLocaleString();
+    document.getElementById('dash-songpa').textContent  = visSongpa.toLocaleString();
+  }
+
+  map.on('moveend zoomend', updateDashboard);
 
   // ── 패널 토글 ────────────────────────────────────────
   const panelToggleBtn = document.getElementById('panel-toggle');
