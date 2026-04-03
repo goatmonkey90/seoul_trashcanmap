@@ -1027,7 +1027,6 @@
         const el = document.getElementById(`stat-${src.name}`);
         if (el) el.textContent = cnt.toLocaleString() + '개';
       }
-      document.getElementById('stat-total').textContent = allData.length.toLocaleString() + '개';
 
       document.getElementById('loading').style.display = 'none';
       buildDongLayer();
