@@ -642,21 +642,54 @@
     }
     .roadview-btn:hover { background: #FDD835; }
 
-    /* ── 지도 대시보드 ── */
-    #map-dashboard {
+    /* ── 지도 대시보드 래퍼 ── */
+    #map-controls {
       position: fixed;
-      bottom: 100px;
+      top: 10px;
       left: 10px;
       z-index: 400;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    /* ── 대시보드 배너 ── */
+    #dash-banner-link {
+      display: block;
+      position: relative;
+      line-height: 0;
+    }
+    #dash-banner-link img {
+      width: 100%;
+      height: 60px;
+      object-fit: cover;
+      display: block;
+      transition: opacity 0.15s;
+    }
+    #dash-banner-link:hover img { opacity: 0.88; }
+    .dash-banner-label {
+      position: absolute;
+      bottom: 5px; right: 7px;
+      font-size: 9px;
+      color: rgba(255,255,255,0.75);
+      background: rgba(0,0,0,0.35);
+      padding: 1px 5px;
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    /* ── 지도 대시보드 ── */
+    #map-dashboard {
       background: var(--dash-bg);
       backdrop-filter: blur(8px);
-      border-radius: 12px;
       padding: 8px 14px;
       display: flex;
       align-items: center;
       gap: 12px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.10);
-      border: 1px solid var(--border);
+      border-top: 1px solid var(--border);
     }
     .dash-item { display: flex; flex-direction: column; align-items: center; gap: 1px; pointer-events: none; }
     .dash-num  { font-size: 15px; font-weight: 800; color: var(--dash-num); line-height: 1; }
@@ -688,35 +721,6 @@
       color: var(--text-primary);
     }
 
-    /* ── 배너 ── */
-    .panel-banner {
-      flex-shrink: 0;
-      border-top: 1px solid var(--border);
-    }
-    .panel-banner a {
-      display: block;
-      position: relative;
-      overflow: hidden;
-    }
-    .panel-banner img {
-      width: 100%;
-      height: 72px;
-      object-fit: cover;
-      display: block;
-      transition: opacity 0.15s;
-    }
-    .panel-banner a:hover img { opacity: 0.88; }
-    .panel-banner-label {
-      position: absolute;
-      bottom: 6px; right: 8px;
-      font-size: 9px;
-      color: rgba(255,255,255,0.7);
-      background: rgba(0,0,0,0.35);
-      padding: 2px 6px;
-      border-radius: 4px;
-      pointer-events: none;
-    }
-
     /* 모바일 */
     @media (max-width: 680px) {
       :root { --panel-w: 0px; }
@@ -745,7 +749,14 @@
 <!-- 지도 -->
 <div id="map"></div>
 
-<!-- 지도 위 대시보드 -->
+<!-- 지도 위 대시보드 + 배너 -->
+<div id="map-controls">
+<a id="dash-banner-link"
+   href="https://store.steampowered.com/app/3470500/Ember_and_Blade/?utm_source=trashcanmap&utm_medium=banner&utm_campaign=dashboard"
+   target="_blank" rel="noopener">
+  <img src="./emberandblade_banner.jpg" alt="Ember and Blade - Steam" />
+  <span class="dash-banner-label">AD</span>
+</a>
 <div id="map-dashboard">
   <div class="dash-item">
     <span class="dash-num" id="dash-total">-</span>
@@ -769,9 +780,10 @@
   <div class="dash-sep">|</div>
   <div class="theme-ctrl">
     <button class="theme-btn" data-theme="light" title="라이트 모드">☀️</button>
-    <button class="theme-btn" data-theme="system" title="시스템 설정">🖥️</button>
     <button class="theme-btn" data-theme="dark" title="다크 모드">🌙</button>
+    <button class="theme-btn" data-theme="system" title="시스템 설정">🖥️</button>
   </div>
+</div>
 </div>
 
 <!-- 패널 접기/펼치기 버튼 -->
@@ -868,15 +880,6 @@
 
   </div>
 
-  <!-- 배너 -->
-  <div class="panel-banner">
-    <a id="banner-link"
-       href="https://store.steampowered.com/app/3470500/Ember_and_Blade/?utm_source=trashcanmap&utm_medium=banner&utm_campaign=sidebar"
-       target="_blank" rel="noopener">
-      <img src="./emberandblade_banner.jpg" alt="Ember and Blade - Steam" />
-      <span class="panel-banner-label">AD</span>
-    </a>
-  </div>
 </div>
 
 <!-- 위치 동의 모달 -->
@@ -979,7 +982,7 @@
 
   // ── 배너 클릭 카운터 (localStorage) ──────────────────
   // 확인 방법: 브라우저 콘솔에서 bannerClicks() 실행
-  document.getElementById('banner-link').addEventListener('click', () => {
+  document.getElementById('dash-banner-link').addEventListener('click', () => {
     const key  = 'eab_banner_clicks';
     const logs = JSON.parse(localStorage.getItem(key) || '[]');
     logs.push(new Date().toISOString());
