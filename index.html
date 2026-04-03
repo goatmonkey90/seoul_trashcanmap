@@ -544,18 +544,22 @@
     <div class="panel-logo">
       <div class="panel-logo-icon">🗑️</div>
       <div>
-        <h1>강남구 쓰레기통 지도</h1>
-        <span>Seoul Gangnam-gu</span>
+        <h1>서울 쓰레기통 지도</h1>
+        <span>강남구 · 송파구</span>
       </div>
     </div>
     <div class="stat-row">
-      <div class="stat-badge">
-        <span class="num" id="stat-total">-</span>
-        <div class="label">전체 쓰레기통</div>
+      <div class="stat-badge" style="border-left: 3px solid #2e7d52;">
+        <span class="num" id="stat-강남구">-</span>
+        <div class="label">강남구</div>
+      </div>
+      <div class="stat-badge" style="border-left: 3px solid #1565C0;">
+        <span class="num" id="stat-송파구">-</span>
+        <div class="label">송파구</div>
       </div>
       <div class="stat-badge">
         <span class="num" id="stat-nearest">-</span>
-        <div class="label">가장 가까운 거리</div>
+        <div class="label">내 위치 거리</div>
       </div>
     </div>
   </div>
@@ -566,9 +570,11 @@
     <div id="view-default">
       <div class="section-title">안내</div>
       <div class="info-card">
-        강남구의 <strong>모든 공공 쓰레기통</strong> 위치를 지도에서 확인하세요.<br><br>
-        지도를 드래그하고 핀을 클릭하면 <strong>상세 정보</strong>를 볼 수 있어요.<br><br>
-        📍 내 위치 버튼으로 <strong>가장 가까운 쓰레기통</strong>을 찾을 수 있어요.
+        <strong style="color:#2e7d52;">강남구</strong>와 <strong style="color:#1565C0;">송파구</strong>의
+        공공 쓰레기통 위치를 한눈에 확인하세요.<br><br>
+        핀을 클릭하면 <strong>상세 정보</strong>를 볼 수 있고,<br>
+        줌아웃하면 <strong>동 단위 현황</strong>이 표시됩니다.<br><br>
+        📍 내 위치 버튼으로 <strong>가장 가까운 쓰레기통</strong>을 찾아보세요.
       </div>
 
       <button id="locate-btn">📍 가까운 쓰레기통 찾기</button>
@@ -582,7 +588,7 @@
 
       <div class="section-title" style="margin-top:20px">데이터 출처</div>
       <div class="info-card" style="font-size:12px; color:#666;">
-        강남구청 공공데이터<br>
+        강남구청 공공데이터 · 송파구청 공공데이터<br>
         (공공데이터포털 제공)
       </div>
     </div>
@@ -639,21 +645,39 @@
 <script>
   // ── 설정 ─────────────────────────────────────────────
   const SERVICE_KEY = 'f5bd6e169d4177d3b845f9b280f46416a1129d405cddbdf1ba8864dfbff36df4';
-  const API_BASE    = 'https://api.odcloud.kr/api/15038054/v1/uddi:bd7d78ba-ef6a-4865-8959-a14836e95ede';
+
+  const SOURCES = [
+    {
+      name: '강남구',
+      color: '#2e7d52',       // 핀 색상 (초록)
+      pinInner: '#43a86d',
+      dongBg: 'rgba(30,90,58,0.88)',
+      url: 'https://api.odcloud.kr/api/15038054/v1/uddi:bd7d78ba-ef6a-4865-8959-a14836e95ede',
+      latField: null, lonField: null, addrField: null,
+    },
+    {
+      name: '송파구',
+      color: '#1565C0',       // 핀 색상 (파랑)
+      pinInner: '#1976D2',
+      dongBg: 'rgba(21,60,130,0.88)',
+      url: 'https://api.odcloud.kr/api/15096706/v1/uddi:205421b7-9a46-4c8a-99b6-d4d3cae303d0',
+      latField: null, lonField: null, addrField: null,
+    },
+  ];
 
   // 커스텀 마커 이미지를 사용하려면 아래 경로를 변경하세요.
   // null 이면 기본 SVG 핀을 사용합니다.
-  // 예: const CUSTOM_ICON_URL = './icon.png';
   const CUSTOM_ICON_URL = null;
 
-  const LAT_FIELDS  = ['위도','latitude','LAT','lat','Y좌표','y좌표','WGS84위도'];
-  const LON_FIELDS  = ['경도','longitude','LON','lon','X좌표','x좌표','WGS84경도'];
-  const ADDR_FIELDS = ['설치위치','주소','도로명주소','지번주소','위치','소재지'];
+  const LAT_FIELDS  = ['위도','latitude','LAT','lat','Y좌표','y좌표','WGS84위도','위도(EPSG4326)'];
+  const LON_FIELDS  = ['경도','longitude','LON','lon','X좌표','x좌표','WGS84경도','경도(EPSG4326)'];
+  const ADDR_FIELDS = ['설치위치','주소','도로명주소','지번주소','위치','소재지','설치장소'];
 
   // ── 지도 초기화 ──────────────────────────────────────
+  // 강남구·송파구 중간 지점으로 초기 센터 조정
   const map = L.map('map', {
-    center: [37.5172, 127.0473],
-    zoom: 14,
+    center: [37.5050, 127.0900],
+    zoom: 13,
     zoomControl: false,
   });
 
@@ -680,34 +704,25 @@
   const DONG_THRESHOLD = 14;
 
   // ── SVG 핀 아이콘 생성 ────────────────────────────────
-  function makePinSVG(color = '#2e7d52', highlight = false) {
+  function makePinSVG(color, innerColor, highlight = false) {
     const inner = highlight ? '#fff176' : 'white';
+    const ic    = highlight ? '#e65100' : innerColor;
     return `
       <svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46" class="trash-pin">
-        <defs>
-          <filter id="s${highlight?'h':'n'}" x="-20%" y="-10%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-opacity="0.28"/>
-          </filter>
-        </defs>
-        <!-- 핀 몸체 -->
         <path d="M18 44 C18 44 4 30 4 18 A14 14 0 0 1 32 18 C32 30 18 44 18 44Z"
-              fill="${color}" filter="url(#s${highlight?'h':'n'})"/>
-        <!-- 핀 상단 원 (밝게) -->
-        <circle cx="18" cy="18" r="11" fill="${highlight ? '#ffee58' : '#43a86d'}"/>
-        <!-- 쓰레기통 뚜껑 손잡이 -->
-        <rect x="14" y="10" width="8" height="3" rx="1.5" fill="${inner}" opacity="0.95"/>
-        <!-- 쓰레기통 뚜껑 -->
-        <rect x="10" y="12" width="16" height="4" rx="2" fill="${inner}" opacity="0.95"/>
-        <!-- 쓰레기통 몸통 -->
-        <rect x="11" y="16" width="14" height="11" rx="2" fill="${inner}" opacity="0.95"/>
-        <!-- 세로 줄 -->
-        <line x1="15.5" y1="18" x2="15.5" y2="25" stroke="${color}" stroke-width="1.2" opacity="0.7"/>
-        <line x1="18.5" y1="18" x2="18.5" y2="25" stroke="${color}" stroke-width="1.2" opacity="0.7"/>
-        <line x1="21.5" y1="18" x2="21.5" y2="25" stroke="${color}" stroke-width="1.2" opacity="0.7"/>
+              fill="${highlight ? '#e65100' : color}"
+              style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.28))"/>
+        <circle cx="18" cy="18" r="11" fill="${highlight ? '#ffee58' : ic}"/>
+        <rect x="14" y="10" width="8"  height="3"  rx="1.5" fill="${inner}" opacity="0.95"/>
+        <rect x="10" y="12" width="16" height="4"  rx="2"   fill="${inner}" opacity="0.95"/>
+        <rect x="11" y="16" width="14" height="11" rx="2"   fill="${inner}" opacity="0.95"/>
+        <line x1="15.5" y1="18" x2="15.5" y2="25" stroke="${highlight ? '#e65100' : color}" stroke-width="1.2" opacity="0.7"/>
+        <line x1="18.5" y1="18" x2="18.5" y2="25" stroke="${highlight ? '#e65100' : color}" stroke-width="1.2" opacity="0.7"/>
+        <line x1="21.5" y1="18" x2="21.5" y2="25" stroke="${highlight ? '#e65100' : color}" stroke-width="1.2" opacity="0.7"/>
       </svg>`;
   }
 
-  function makeIcon(highlight = false) {
+  function makeIcon(src, highlight = false) {
     if (CUSTOM_ICON_URL) {
       return L.icon({
         iconUrl: CUSTOM_ICON_URL,
@@ -716,9 +731,8 @@
         tooltipAnchor: [0, -46],
       });
     }
-    const color = highlight ? '#e65100' : '#2e7d52';
     return L.divIcon({
-      html: makePinSVG(color, highlight),
+      html: makePinSVG(src.color, src.pinInner, highlight),
       className: '',
       iconSize: [36, 46],
       iconAnchor: [18, 46],
@@ -733,23 +747,23 @@
     iconAnchor: [7, 7],
   });
 
-  // ── 필드 감지 ────────────────────────────────────────
-  function detectFields(sample) {
+  // ── 필드 감지 (소스별) ──────────────────────────────
+  function detectFields(src, sample) {
     const keys = Object.keys(sample);
-    latField  = LAT_FIELDS.find(f => keys.includes(f)) || null;
-    lonField  = LON_FIELDS.find(f => keys.includes(f)) || null;
-    addrField = ADDR_FIELDS.find(f => keys.includes(f)) || null;
+    src.latField  = LAT_FIELDS.find(f => keys.includes(f))  || null;
+    src.lonField  = LON_FIELDS.find(f => keys.includes(f))  || null;
+    src.addrField = ADDR_FIELDS.find(f => keys.includes(f)) || null;
 
-    if (!latField || !lonField) {
+    if (!src.latField || !src.lonField) {
       for (const k of keys) {
         const v = parseFloat(sample[k]);
         if (!isNaN(v)) {
-          if (v > 37 && v < 38) latField  = latField  || k;
-          if (v > 126 && v < 128) lonField = lonField || k;
+          if (v > 37  && v < 38)  src.latField = src.latField || k;
+          if (v > 126 && v < 128) src.lonField = src.lonField || k;
         }
       }
     }
-    console.log('필드 감지:', { latField, lonField, addrField, 전체: keys });
+    console.log(`[${src.name}] 필드 감지:`, { lat: src.latField, lon: src.lonField, addr: src.addrField, 전체: keys });
   }
 
   // ── 거리 계산 ────────────────────────────────────────
@@ -771,13 +785,14 @@
     document.getElementById('view-default').style.display = 'none';
     document.getElementById('view-detail').style.display  = 'block';
 
-    const addr = addrField ? (item[addrField] || '') : '';
+    const src  = item._src;
+    const addr = src.addrField ? (item[src.addrField] || '') : '';
     document.getElementById('detail-title').textContent    = addr || '쓰레기통';
-    document.getElementById('detail-subtitle').textContent = '강남구';
+    document.getElementById('detail-subtitle').textContent = src.name;
 
     // 거리
-    const lat = parseFloat(item[latField]);
-    const lon = parseFloat(item[lonField]);
+    const lat = parseFloat(item[src.latField]);
+    const lon = parseFloat(item[src.lonField]);
     const distWrap = document.getElementById('detail-dist-wrap');
     if (userLatLng && !isNaN(lat) && !isNaN(lon)) {
       const d = distM(userLatLng.lat, userLatLng.lng, lat, lon);
@@ -787,10 +802,10 @@
       distWrap.style.display = 'none';
     }
 
-    // 전체 필드 목록
+    // 전체 필드 목록 (_src 내부 키 제외)
     const container = document.getElementById('detail-fields');
     container.innerHTML = '';
-    const SKIP = new Set([latField, lonField]);
+    const SKIP = new Set([src.latField, src.lonField, '_src']);
     for (const [k, v] of Object.entries(item)) {
       if (SKIP.has(k) || !String(v).trim()) continue;
       const row = document.createElement('div');
@@ -798,7 +813,6 @@
       row.innerHTML = `<span class="field-key">${k}</span><span class="field-val">${v}</span>`;
       container.appendChild(row);
     }
-    // 좌표도 표시
     if (!isNaN(lat) && !isNaN(lon)) {
       const row = document.createElement('div');
       row.className = 'detail-field';
@@ -819,43 +833,46 @@
     if (dongLayer) map.removeLayer(dongLayer);
     dongLayer = L.layerGroup();
 
-    const groups = {};
-    for (const item of allData) {
-      const addr = addrField ? (item[addrField] || '') : '';
-      const match = addr.match(/([가-힣]+동)/);
-      const dong = match ? match[1] : null;
-      if (!dong) continue;
+    // 구별로 동 집계
+    for (const src of SOURCES) {
+      const groups = {};
+      for (const item of allData) {
+        if (item._src !== src) continue;
+        const addr = src.addrField ? (item[src.addrField] || '') : '';
+        const match = addr.match(/([가-힣]+동)/);
+        const dong = match ? match[1] : null;
+        if (!dong) continue;
 
-      const lat = parseFloat(item[latField]);
-      const lon = parseFloat(item[lonField]);
-      if (isNaN(lat) || isNaN(lon)) continue;
+        const lat = parseFloat(item[src.latField]);
+        const lon = parseFloat(item[src.lonField]);
+        if (isNaN(lat) || isNaN(lon)) continue;
 
-      if (!groups[dong]) groups[dong] = { latSum: 0, lonSum: 0, count: 0 };
-      groups[dong].latSum += lat;
-      groups[dong].lonSum += lon;
-      groups[dong].count++;
-    }
+        if (!groups[dong]) groups[dong] = { latSum: 0, lonSum: 0, count: 0 };
+        groups[dong].latSum += lat;
+        groups[dong].lonSum += lon;
+        groups[dong].count++;
+      }
 
-    for (const [dong, g] of Object.entries(groups)) {
-      const lat = g.latSum / g.count;
-      const lon = g.lonSum / g.count;
+      for (const [dong, g] of Object.entries(groups)) {
+        const lat = g.latSum / g.count;
+        const lon = g.lonSum / g.count;
 
-      const icon = L.divIcon({
-        html: `<div class="dong-bubble">
-          <div class="d-name">${dong}</div>
-          <div class="d-count">🗑️ ${g.count}개</div>
-        </div>`,
-        className: '',
-        iconSize: [1, 1],
-        iconAnchor: [0, 0],
-      });
+        const icon = L.divIcon({
+          html: `<div class="dong-bubble" style="background:${src.dongBg};">
+            <div class="d-name">${dong}</div>
+            <div class="d-count">🗑️ ${g.count}개</div>
+          </div>`,
+          className: '',
+          iconSize: [1, 1],
+          iconAnchor: [0, 0],
+        });
 
-      const m = L.marker([lat, lon], { icon });
-      // 클릭하면 해당 동으로 줌인 (개별 핀 레벨)
-      m.on('click', () => {
-        map.flyTo([lat, lon], DONG_THRESHOLD, { duration: 0.8 });
-      });
-      dongLayer.addLayer(m);
+        const m = L.marker([lat, lon], { icon });
+        m.on('click', () => {
+          map.flyTo([lat, lon], DONG_THRESHOLD, { duration: 0.8 });
+        });
+        dongLayer.addLayer(m);
+      }
     }
   }
 
@@ -895,19 +912,20 @@
     });
 
     for (const item of allData) {
-      const lat = parseFloat(item[latField]);
-      const lon = parseFloat(item[lonField]);
+      const src = item._src;
+      const lat = parseFloat(item[src.latField]);
+      const lon = parseFloat(item[src.lonField]);
       if (isNaN(lat) || isNaN(lon)) continue;
 
       const isHighlight = highlightItem && item === highlightItem;
-      const addr = addrField ? (item[addrField] || '주소 없음') : '위치 정보 없음';
+      const addr = src.addrField ? (item[src.addrField] || '주소 없음') : '위치 정보 없음';
 
       const marker = L.marker([lat, lon], {
-        icon: makeIcon(isHighlight),
+        icon: makeIcon(src, isHighlight),
         zIndexOffset: isHighlight ? 1000 : 0,
       });
 
-      marker.bindTooltip(addr, {
+      marker.bindTooltip(`[${src.name}] ${addr}`, {
         permanent: false,
         direction: 'top',
         offset: [0, -44],
@@ -932,8 +950,9 @@
   function findNearest(latlng) {
     let minDist = Infinity, best = null;
     for (const item of allData) {
-      const lat = parseFloat(item[latField]);
-      const lon = parseFloat(item[lonField]);
+      const src = item._src;
+      const lat = parseFloat(item[src.latField]);
+      const lon = parseFloat(item[src.lonField]);
       if (isNaN(lat) || isNaN(lon)) continue;
       const d = distM(latlng.lat, latlng.lng, lat, lon);
       if (d < minDist) { minDist = d; best = item; }
@@ -955,58 +974,70 @@
     nearestItem = item;
     renderMarkers(item);
 
-    const addr = addrField ? (item[addrField] || '주소 없음') : '위치 정보 없음';
-    document.getElementById('nc-addr').textContent = addr;
+    const src  = item._src;
+    const addr = src.addrField ? (item[src.addrField] || '주소 없음') : '위치 정보 없음';
+    document.getElementById('nc-addr').textContent = `[${src.name}] ${addr}`;
     document.getElementById('nc-dist').textContent = `내 위치에서 ${fmtDist(dist)}`;
     document.getElementById('stat-nearest').textContent = fmtDist(dist);
     document.getElementById('nearest-card').style.display = 'block';
 
     document.getElementById('nc-go').onclick = () => {
-      const lat = parseFloat(item[latField]);
-      const lon = parseFloat(item[lonField]);
+      const lat = parseFloat(item[src.latField]);
+      const lon = parseFloat(item[src.lonField]);
       map.flyTo([lat, lon], 18, { duration: 1.2 });
       showDetail(item);
     };
   }
 
 
-  // ── API 로드 ──────────────────────────────────────────
+  // ── 단일 소스 로드 ──────────────────────────────────
+  async function fetchSource(src) {
+    const key = encodeURIComponent(SERVICE_KEY);
+    const firstRes  = await fetch(`${src.url}?page=1&perPage=1000&serviceKey=${key}`, { headers: { accept: '*/*' } });
+    const firstJson = await firstRes.json();
+    if (firstJson.code && firstJson.code < 0) throw new Error(`[${src.name}] ${firstJson.msg}`);
+
+    let data  = firstJson.data || [];
+    const total = firstJson.totalCount || firstJson.matchCount || 0;
+
+    if (total > 1000) {
+      const pages = Math.ceil(total / 1000);
+      const ps = [];
+      for (let p = 2; p <= pages; p++) {
+        ps.push(fetch(`${src.url}?page=${p}&perPage=1000&serviceKey=${key}`, { headers: { accept: '*/*' } }).then(r => r.json()));
+      }
+      const rest = await Promise.all(ps);
+      for (const r of rest) if (r.data) data = data.concat(r.data);
+    }
+
+    if (data.length > 0) detectFields(src, data[0]);
+    // 각 아이템에 소스 참조 태깅
+    data.forEach(item => item._src = src);
+    return data;
+  }
+
+  // ── API 로드 (모든 소스 병렬) ────────────────────────
   async function loadData() {
     document.getElementById('loading').style.display = 'flex';
     try {
-      const firstUrl = `${API_BASE}?page=1&perPage=1000&serviceKey=${encodeURIComponent(SERVICE_KEY)}`;
-      const firstRes = await fetch(firstUrl, { headers: { accept: '*/*' } });
-      const firstJson = await firstRes.json();
+      const results = await Promise.all(SOURCES.map(fetchSource));
+      allData = results.flat();
 
-      if (firstJson.code && firstJson.code < 0) throw new Error(firstJson.msg);
-
-      let data = firstJson.data || [];
-      const total = firstJson.totalCount || firstJson.matchCount || 0;
-
-      if (total > 1000) {
-        const pages = Math.ceil(total / 1000);
-        const ps = [];
-        for (let p = 2; p <= pages; p++) {
-          const url = `${API_BASE}?page=${p}&perPage=1000&serviceKey=${encodeURIComponent(SERVICE_KEY)}`;
-          ps.push(fetch(url, { headers: { accept: '*/*' } }).then(r => r.json()));
-        }
-        const rest = await Promise.all(ps);
-        for (const r of rest) if (r.data) data = data.concat(r.data);
+      // 구별 카운트 업데이트
+      for (const src of SOURCES) {
+        const cnt = allData.filter(d => d._src === src).length;
+        const el = document.getElementById(`stat-${src.name}`);
+        if (el) el.textContent = cnt.toLocaleString() + '개';
       }
-
-      allData = data;
-      if (data.length > 0) detectFields(data[0]);
-
       document.getElementById('stat-total').textContent = allData.length.toLocaleString() + '개';
+
       document.getElementById('loading').style.display = 'none';
       buildDongLayer();
       renderMarkers();
-      // 데이터 로드 완료 후 위치 동의 모달 표시
       showLocationModal();
 
     } catch (err) {
       console.error(err);
-      document.getElementById('loading').style.display = 'none';
       document.getElementById('loading').innerHTML =
         `<p style="color:#e53935;font-size:14px;">데이터 로드 실패: ${err.message}</p>`;
       document.getElementById('loading').style.display = 'flex';
