@@ -1190,9 +1190,21 @@
     setTimeout(() => map && map.relayout(), 360);
   });
 
-  // ── 데이터 로드 ──────────────────────────────────────
-  async function loadData() {
-    document.getElementById('loading').style.display = 'flex';
+  // ── 초기화 조율 (데이터 + 지도 모두 준비되면 렌더) ──
+  let _dataReady = false;
+  let _mapReady  = false;
+
+  function _tryRender() {
+    if (!_dataReady || !_mapReady) return;
+    document.getElementById('loading').style.display = 'none';
+    buildDongOverlays();
+    renderMarkers();
+    updateDashboard();
+    document.getElementById('location-modal').style.display = 'flex';
+  }
+
+  // ── 데이터 로드 (지도 SDK와 독립적으로 즉시 시작) ────
+  (async function loadData() {
     try {
       const rows = await fetch('./data.json').then(r => r.json());
       const srcByName = Object.fromEntries(SOURCES.map(s => [s.name, s]));
@@ -1208,18 +1220,15 @@
         const el = document.getElementById(src.statId);
         if (el) el.textContent = allData.filter(d => d._src === src).length.toLocaleString() + '개';
       }
-      document.getElementById('loading').style.display = 'none';
-      buildDongOverlays();
-      renderMarkers();
-      updateDashboard();
-      document.getElementById('location-modal').style.display = 'flex';
+      _dataReady = true;
+      document.querySelector('#loading p').textContent = '지도를 불러오는 중...';
+      _tryRender();
     } catch (err) {
       console.error(err);
       document.getElementById('loading').innerHTML =
         `<p style="color:#e53935;font-size:14px;">데이터 로드 실패: ${err.message}</p>`;
-      document.getElementById('loading').style.display = 'flex';
     }
-  }
+  })();
 
   // ── Kakao Maps 초기화 ────────────────────────────────
   kakao.maps.load(function() {
@@ -1264,7 +1273,8 @@
     kakao.maps.event.addListener(map, 'zoom_changed', () => { updateLayers(); updateDashboard(); });
     kakao.maps.event.addListener(map, 'idle', updateDashboard);
 
-    loadData();
+    _mapReady = true;
+    _tryRender();
   });
 </script>
 </body>
