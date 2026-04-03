@@ -658,17 +658,23 @@
 
     /* ── 대시보드 배너 ── */
     #dash-banner-link {
-      display: block;
-      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 6px 8px;
       line-height: 0;
+      position: relative;
     }
     #dash-banner-link img {
-      width: 100%;
-      height: auto;
+      height: 72px;
+      width: auto;
+      max-width: 100%;
       display: block;
+      border-radius: 6px;
       transition: opacity 0.15s;
     }
-    #dash-banner-link:hover img { opacity: 0.88; }
+    #dash-banner-link:hover img { opacity: 0.85; }
     .dash-banner-label {
       position: absolute;
       bottom: 5px; right: 7px;
