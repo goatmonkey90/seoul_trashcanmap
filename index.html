@@ -550,11 +550,11 @@
     </div>
     <div class="stat-row">
       <div class="stat-badge" style="border-left: 3px solid #2e7d52;">
-        <span class="num" id="stat-강남구">-</span>
+        <span class="num" id="stat-gangnam">-</span>
         <div class="label">강남구</div>
       </div>
       <div class="stat-badge" style="border-left: 3px solid #1565C0;">
-        <span class="num" id="stat-송파구">-</span>
+        <span class="num" id="stat-songpa">-</span>
         <div class="label">송파구</div>
       </div>
       <div class="stat-badge">
@@ -649,7 +649,8 @@
   const SOURCES = [
     {
       name: '강남구',
-      color: '#2e7d52',       // 핀 색상 (초록)
+      statId: 'stat-gangnam',
+      color: '#2e7d52',
       pinInner: '#43a86d',
       dongBg: 'rgba(30,90,58,0.88)',
       url: 'https://api.odcloud.kr/api/15038054/v1/uddi:bd7d78ba-ef6a-4865-8959-a14836e95ede',
@@ -657,7 +658,8 @@
     },
     {
       name: '송파구',
-      color: '#1565C0',       // 핀 색상 (파랑)
+      statId: 'stat-songpa',
+      color: '#1565C0',
       pinInner: '#1976D2',
       dongBg: 'rgba(21,60,130,0.88)',
       url: 'https://api.odcloud.kr/api/15096706/v1/uddi:205421b7-9a46-4c8a-99b6-d4d3cae303d0',
@@ -1024,13 +1026,14 @@
       // 구별 카운트 업데이트
       for (const src of SOURCES) {
         const cnt = allData.filter(d => d._src === src).length;
-        const el = document.getElementById(`stat-${src.name}`);
+        const el = document.getElementById(src.statId);
         if (el) el.textContent = cnt.toLocaleString() + '개';
       }
 
       document.getElementById('loading').style.display = 'none';
-      buildDongLayer();
-      renderMarkers();
+
+      try { buildDongLayer(); } catch(e) { console.error('buildDongLayer 오류:', e); }
+      try { renderMarkers();  } catch(e) { console.error('renderMarkers 오류:', e); }
       showLocationModal();
 
     } catch (err) {
