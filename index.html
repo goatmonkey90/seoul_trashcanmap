@@ -641,6 +641,33 @@
       flex-shrink: 0;
       border-top: 1px solid var(--border);
     }
+    .data-attribution {
+      padding: 10px 14px 6px;
+      font-size: 11px;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .data-attribution a {
+      color: var(--green);
+      text-decoration: none;
+    }
+    .data-attribution a:hover { text-decoration: underline; }
+    .data-warn {
+      margin-top: 6px;
+      padding: 6px 8px;
+      border-radius: 5px;
+      font-size: 10px;
+      line-height: 1.6;
+      background: #fff3cd;
+      color: #664d03;
+      border-left: 3px solid #ffc107;
+    }
+    body.dark .data-warn {
+      background: #2a2000;
+      color: #ffd666;
+      border-left-color: #c89a00;
+    }
     .panel-about {
       font-size: 11px;
       color: var(--text-muted);
@@ -850,10 +877,10 @@
   </div>
 
   <div class="panel-footer">
-    <div style="padding: 10px 14px 6px; font-size:11px; line-height:1.7; color:#666; border-top:1px solid #eee;">
-      <div>📂 <a href="https://data.seoul.go.kr/dataList/OA-2705/S/1/datasetView.do" target="_blank" rel="noopener" style="color:#2e7d52;">서울시 가로쓰레기통 설치정보</a></div>
-      <div>📂 <a href="https://www.data.go.kr/data/15013752/standard.do" target="_blank" rel="noopener" style="color:#2e7d52;">전국휴지통표준데이터</a></div>
-      <div style="margin-top:6px; padding:6px 8px; background:#fff8e1; border-radius:5px; color:#7a5800; font-size:10px; line-height:1.6;">
+    <div class="data-attribution">
+      <div>📂 <a href="https://data.seoul.go.kr/dataList/OA-2705/S/1/datasetView.do" target="_blank" rel="noopener">서울시 가로쓰레기통 설치정보</a></div>
+      <div>📂 <a href="https://www.data.go.kr/data/15013752/standard.do" target="_blank" rel="noopener">전국휴지통표준데이터</a></div>
+      <div class="data-warn">
         ⚠️ 일부 좌표는 도로명주소 기반 지오코딩으로,<br>실제 위치와 최대 수백 m 오차가 있을 수 있습니다.
       </div>
     </div>
