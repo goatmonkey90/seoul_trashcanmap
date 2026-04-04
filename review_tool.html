@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>서울 클린맵 — 좌표 검수 도구</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; background: #f5f5f5; height: 100vh; overflow: hidden; }
+
+    #header {
+      background: #1a3a2a; color: white;
+      padding: 10px 20px;
+      display: flex; align-items: center; gap: 16px;
+      height: 48px;
+    }
+    #header h1 { font-size: 15px; }
+    #header .sub { font-size: 11px; opacity: 0.65; }
+    #progress { margin-left: auto; font-size: 12px; background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; white-space: nowrap; }
+
+    #main { display: flex; height: calc(100vh - 48px); }
+
+    /* ── 좌측 목록 ── */
+    #sidebar { width: 320px; flex-shrink: 0; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+
+    #load-area { padding: 12px 14px; border-bottom: 1px solid #eee; background: #f9f9f9; }
+    #load-area label { font-weight: 700; font-size: 11px; color: #555; display: block; margin-bottom: 6px; }
+    #file-input { width: 100%; font-size: 12px; }
+    #stats { font-size: 11px; color: #888; margin-top: 5px; }
+
+    #item-list { flex: 1; overflow-y: auto; }
+
+    .item {
+      padding: 9px 14px; border-bottom: 1px solid #f0f0f0;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .item:hover { background: #f5fdf8; }
+    .item.active { background: #e8f5e9 !important; border-left: 3px solid #2e7d32; padding-left: 11px; }
+    .item.decided { opacity: 0.45; }
+
+    .badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 4px; margin-right: 5px; vertical-align: middle;
+    }
+    .badge-BAD       { background: #ffebee; color: #c62828; }
+    .badge-SUSPECT   { background: #fff3e0; color: #e65100; }
+    .badge-NOT_FOUND { background: #f3e5f5; color: #6a1b9a; }
+    .badge-ok        { background: #e8f5e9; color: #2e7d32; }
+    .badge-skip      { background: #eeeeee; color: #757575; }
+
+    .item-label { font-size: 12px; font-weight: 600; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-meta  { font-size: 11px; color: #999; margin-top: 1px; }
+    .item-dist  { font-size: 11px; font-weight: 600; color: #e65100; }
+
+    #empty { display: flex; align-items: center; justify-content: center; height: 200px; color: #bbb; flex-direction: column; gap: 8px; font-size: 13px; }
+
+    /* ── 우측 지도 ── */
+    #right { flex: 1; display: flex; flex-direction: column; }
+    #map { flex: 1; }
+
+    #legend {
+      display: flex; gap: 20px; font-size: 11px; color: #666;
+      padding: 6px 16px; background: #f9f9f9; border-top: 1px solid #eee;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
+
+    #action-bar {
+      background: white; border-top: 1px solid #ddd;
+      padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+    }
+    #item-info { flex: 1; overflow: hidden; }
+    #item-info .title { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #item-info .sub   { font-size: 11px; color: #888; margin-top: 2px; }
+
+    .btn { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; transition: background 0.15s; }
+    #btn-accept  { background: #2e7d32; color: white; }
+    #btn-accept:hover:not(:disabled) { background: #1b5e20; }
+    #btn-skip    { background: #eeeeee; color: #555; }
+    #btn-skip:hover:not(:disabled)   { background: #ddd; }
+    #btn-export  { background: #1565c0; color: white; margin-left: 6px; }
+    #btn-export:hover:not(:disabled) { background: #0d47a1; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <div>
+    <h1>🗑️ 서울 클린맵 — 좌표 검수 도구</h1>
+    <div class="sub">verify_result.csv 로드 → 지도에서 확인 → corrections.json 저장 → python apply_corrections.py corrections.json</div>
+  </div>
+  <div id="progress">파일을 로드하세요</div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div id="load-area">
+      <label>verify_result.csv 선택</label>
+      <input type="file" id="file-input" accept=".csv">
+      <div id="stats">python verify_geocode.py 를 먼저 실행하세요.</div>
+    </div>
+    <div id="item-list">
+      <div id="empty">📂 CSV 파일을 로드하면<br>목록이 표시됩니다</div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div id="map"></div>
+    <div id="legend">
+      <span><span class="dot" style="background:#e53935"></span>현재 좌표 (vworld/kakao)</span>
+      <span><span class="dot" style="background:#1565c0"></span>카카오 제안 좌표</span>
+      <span><span class="dot" style="background:#2e7d32"></span>채택 확정</span>
+    </div>
+    <div id="action-bar">
+      <div id="item-info">
+        <div class="title">항목을 선택하세요</div>
+        <div class="sub">—</div>
+      </div>
+      <button class="btn" id="btn-skip"   disabled>건너뛰기</button>
+      <button class="btn" id="btn-accept" disabled>카카오 좌표 채택</button>
+      <button class="btn" id="btn-export" disabled>corrections.json 저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CSV 파서 ──────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
+  if (lines.length < 2) return [];
+  function parseLine(line) {
+    const out = []; let cur = '', inQ = false;
+    for (const c of line) {
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { out.push(cur); cur = ''; }
+      else cur += c;
+    }
+    out.push(cur);
+    return out;
+  }
+  const headers = parseLine(lines[0]).map(h => h.trim());
+  return lines.slice(1)
+    .map(line => {
+      const vals = parseLine(line);
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = (vals[i] || '').trim());
+      return obj;
+    })
+    .filter(r => r.status && r.status !== 'OK');
+}
+
+// ── 지도 ─────────────────────────────────────────────
+const TILE = 'https://api.vworld.kr/req/wmts/1.0.0/89769725-F756-336D-B449-3060DDC54585/Base/{z}/{y}/{x}.png';
+const map = L.map('map').setView([37.555, 126.98], 13);
+L.tileLayer(TILE, { attribution: '© Vworld', maxZoom: 19 }).addTo(map);
+
+function makeIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;background:${color};border:2.5px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35)"></div>`,
+    iconSize: [14, 14], iconAnchor: [7, 7]
+  });
+}
+const iconRed   = makeIcon('#e53935');
+const iconBlue  = makeIcon('#1565c0');
+const iconGreen = makeIcon('#2e7d32');
+
+let curMarker = null, kakaoMarker = null;
+const acceptedMarkers = [];
+
+// ── 상태 ──────────────────────────────────────────────
+let items = [], decisions = {}, corrections = [], currentIdx = null;
+
+// ── 파일 로드 ─────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    items = parseCSV(ev.target.result);
+    decisions = {}; corrections = []; currentIdx = null;
+    renderList();
+    updateProgress();
+    document.getElementById('btn-export').disabled = true;
+
+    const bad  = items.filter(i => i.status === 'BAD').length;
+    const susp = items.filter(i => i.status === 'SUSPECT').length;
+    const nf   = items.filter(i => i.status === 'NOT_FOUND').length;
+    document.getElementById('stats').textContent =
+      `총 ${items.length}건 | BAD: ${bad} | SUSPECT: ${susp} | 미발견: ${nf}`;
+  };
+  reader.readAsText(file, 'utf-8');
+});
+
+// ── 목록 렌더 ─────────────────────────────────────────
+function renderList() {
+  const container = document.getElementById('item-list');
+  container.innerHTML = '';
+  if (!items.length) {
+    container.innerHTML = '<div id="empty">데이터가 없습니다</div>';
+    return;
+  }
+  items.forEach((item, idx) => {
+    const d = decisions[idx];
+    const div = document.createElement('div');
+    div.className = 'item' + (currentIdx === idx ? ' active' : '') + (d ? ' decided' : '');
+    const decidedBadge = d === 'accept' ? '<span class="badge badge-ok">채택</span>'
+                       : d === 'skip'   ? '<span class="badge badge-skip">건너뜀</span>' : '';
+    div.innerHTML = `
+      <div><span class="badge badge-${item.status}">${item.status}</span>${decidedBadge}</div>
+      <div class="item-label" title="${item.label}">${item.label}</div>
+      <div class="item-meta">${item.district}</div>
+      <div class="item-dist">${item.dist_m ? item.dist_m + 'm 차이' : '카카오 미발견'}</div>`;
+    div.addEventListener('click', () => selectItem(idx));
+    container.appendChild(div);
+  });
+}
+
+// ── 항목 선택 ─────────────────────────────────────────
+function selectItem(idx) {
+  currentIdx = idx;
+  const item = items[idx];
+
+  document.querySelectorAll('.item').forEach((el, i) => el.classList.toggle('active', i === idx));
+
+  document.getElementById('item-info').innerHTML = `
+    <div class="title">${item.label}</div>
+    <div class="sub">${item.district} · ${item.dist_m ? item.dist_m + 'm 차이' : '카카오 미발견'} · ${item.kakao_name || '—'}</div>`;
+
+  if (curMarker)   { map.removeLayer(curMarker);   curMarker = null; }
+  if (kakaoMarker) { map.removeLayer(kakaoMarker); kakaoMarker = null; }
+
+  const cLat = parseFloat(item.cur_lat), cLon = parseFloat(item.cur_lon);
+  const kLat = parseFloat(item.kakao_lat), kLon = parseFloat(item.kakao_lon);
+  const hasKakao = item.kakao_lat && item.kakao_lon && !isNaN(kLat);
+
+  if (!isNaN(cLat)) {
+    curMarker = L.marker([cLat, cLon], { icon: iconRed })
+      .bindTooltip(`현재: ${cLat.toFixed(6)}, ${cLon.toFixed(6)}`)
+      .addTo(map);
+  }
+  if (hasKakao) {
+    kakaoMarker = L.marker([kLat, kLon], { icon: iconBlue })
+      .bindTooltip(`카카오: ${kLat.toFixed(6)}, ${kLon.toFixed(6)}\n${item.kakao_name}`)
+      .addTo(map);
+  }
+
+  if (!isNaN(cLat) && hasKakao) {
+    map.fitBounds(L.latLngBounds([[cLat, cLon], [kLat, kLon]]), { padding: [60, 60], maxZoom: 17 });
+  } else if (!isNaN(cLat)) {
+    map.setView([cLat, cLon], 17);
+  }
+
+  document.getElementById('btn-skip').disabled = false;
+  document.getElementById('btn-accept').disabled = !hasKakao;
+}
+
+// ── 채택 ──────────────────────────────────────────────
+document.getElementById('btn-accept').addEventListener('click', () => {
+  if (currentIdx === null) return;
+  const item = items[currentIdx];
+  decisions[currentIdx] = 'accept';
+  corrections.push({
+    cur_lat:  parseFloat(item.cur_lat),
+    cur_lon:  parseFloat(item.cur_lon),
+    new_lat:  parseFloat(item.kakao_lat),
+    new_lon:  parseFloat(item.kakao_lon),
+    label:    item.label,
+    district: item.district,
+    geocode:  'manual'
+  });
+  if (curMarker)   { map.removeLayer(curMarker);   curMarker = null; }
+  if (kakaoMarker) { map.removeLayer(kakaoMarker); kakaoMarker = null; }
+  const kLat = parseFloat(item.kakao_lat), kLon = parseFloat(item.kakao_lon);
+  if (!isNaN(kLat)) {
+    acceptedMarkers.push(L.marker([kLat, kLon], { icon: iconGreen })
+      .bindTooltip('채택됨').addTo(map));
+  }
+  renderList(); updateProgress(); goNext();
+});
+
+// ── 건너뛰기 ──────────────────────────────────────────
+document.getElementById('btn-skip').addEventListener('click', () => {
+  if (currentIdx === null) return;
+  decisions[currentIdx] = 'skip';
+  renderList(); updateProgress(); goNext();
+});
+
+function goNext() {
+  for (let i = currentIdx + 1; i < items.length; i++) {
+    if (!decisions[i]) { selectItem(i); return; }
+  }
+  document.getElementById('btn-export').disabled = corrections.length === 0;
+}
+
+// ── 진행 상황 ─────────────────────────────────────────
+function updateProgress() {
+  const done     = Object.keys(decisions).length;
+  const accepted = Object.values(decisions).filter(d => d === 'accept').length;
+  document.getElementById('progress').textContent =
+    `${done} / ${items.length} 검수 완료 | 채택 ${accepted}건`;
+  if (corrections.length > 0) document.getElementById('btn-export').disabled = false;
+}
+
+// ── 저장 ──────────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(corrections, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'corrections.json';
+  a.click();
+  alert(`corrections.json 저장 완료 (${corrections.length}건)\n\n반영 방법:\n  python apply_corrections.py corrections.json\n  git add data.json && git commit && git push`);
+});
+</script>
+</body>
+</html>
