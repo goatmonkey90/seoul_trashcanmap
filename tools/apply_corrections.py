@@ -16,11 +16,11 @@ def main():
     with open(sys.argv[1], encoding='utf-8') as f:
         corrections = json.load(f)
 
-    with open('data.json', encoding='utf-8') as f:
+    with open('../data.json', encoding='utf-8') as f:
         data = json.load(f)
 
-    backup = f"data_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    shutil.copy('data.json', backup)
+    backup = f"../data_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    shutil.copy('../data.json', backup)
     print(f"백업: {backup}")
 
     applied = 0
@@ -37,10 +37,10 @@ def main():
 
     print(f"\n총 {applied}/{len(corrections)}건 적용")
 
-    with open('data.json', 'w', encoding='utf-8') as f:
+    with open('../data.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     print(f"-> data.json 저장 완료")
-    print(f"\n다음: git add data.json && git commit -m '...' && git push")
+    print(f"\n다음: git add ../data.json && git commit -m '...' && git push")
 
 if __name__ == "__main__":
     main()

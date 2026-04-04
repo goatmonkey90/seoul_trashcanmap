@@ -10,9 +10,9 @@ import openpyxl
 
 # ── 설정 ──────────────────────────────────────────────
 VWORLD_KEY = "89769725-F756-336D-B449-3060DDC54585"
-EXCEL_FILE = "서울특별시 가로쓰레기통 설치정보_202312.xlsx"
-CSV_FILE   = "전국휴지통표준데이터.csv"
-OUTPUT     = "data.json"
+EXCEL_FILE = "../source-data/서울특별시 가로쓰레기통 설치정보_202312.xlsx"
+CSV_FILE   = "../source-data/전국휴지통표준데이터.csv"
+OUTPUT     = "../data.json"
 DELAY      = 0.12
 
 # 서울시 유효 좌표 범위

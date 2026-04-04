@@ -15,7 +15,7 @@ import json, time, math, re, shutil, sys, urllib.request, urllib.parse
 from datetime import datetime
 
 KAKAO_API_KEY = "553e2e606a80c405fff3f61fa3adc613"
-INPUT  = "data.json"
+INPUT  = "../data.json"
 DELAY  = 0.12
 MIN_DIST_TO_UPDATE = 50     # 50m 미만 차이는 교체 안 함
 SEARCH_RADIUS      = 500    # 반경 검색 m

@@ -13,8 +13,8 @@
 import json, csv, time, math, urllib.request, urllib.parse, sys
 
 KAKAO_API_KEY = "553e2e606a80c405fff3f61fa3adc613"
-INPUT      = "data.json"
-OUTPUT_CSV = "verify_result.csv"
+INPUT      = "../data.json"
+OUTPUT_CSV = "../verify_result.csv"
 THRESHOLD_SUSPECT = 200  # 이 거리(m) 이상 차이나면 SUSPECT
 THRESHOLD_BAD     = 500  # 이 거리(m) 이상이면 BAD
 DELAY = 0.12

@@ -1,0 +1,6 @@
+data_backup_*.json
+improve_log_*.txt
+verify_result.csv
+corrections.json
+__pycache__/
+*.pyc
