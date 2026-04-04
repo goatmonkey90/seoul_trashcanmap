@@ -629,26 +629,22 @@
     .panel-footer {
       flex-shrink: 0;
       border-top: 1px solid var(--border);
-      padding: 16px 20px 0;
     }
     .panel-about {
       font-size: 11px;
       color: var(--text-muted);
       line-height: 1.6;
-      margin-bottom: 16px;
+      padding: 12px 20px 16px;
     }
     #dash-banner-link {
       display: block;
       position: relative;
       line-height: 0;
-      border-radius: 8px;
-      overflow: hidden;
-      margin-bottom: 16px;
     }
     #dash-banner-link img {
       width: 100%;
-      height: 60px;
-      object-fit: contain;
+      height: 72px;
+      object-fit: cover;
       display: block;
       transition: opacity 0.15s;
     }
@@ -858,13 +854,13 @@
   </div>
 
   <div class="panel-footer">
-    <p class="panel-about">강남구·송파구 공공 쓰레기통 위치를 한눈에 확인하는 지도 서비스입니다.</p>
     <a id="dash-banner-link"
        href="https://store.steampowered.com/app/3470500/Ember_and_Blade/?utm_source=trashcanmap&utm_medium=banner&utm_campaign=dashboard"
        target="_blank" rel="noopener">
       <img src="./emberandblade_banner.jpg" alt="Ember and Blade - Steam" />
       <span class="dash-banner-label">AD</span>
     </a>
+    <p class="panel-about">강남구·송파구 공공 쓰레기통 위치를 한눈에 확인하는 지도 서비스입니다.</p>
   </div>
 
 </div>
@@ -1042,7 +1038,7 @@
 
     const rwWrap = document.getElementById('detail-roadview-wrap');
     if (!isNaN(lat) && !isNaN(lon)) {
-      document.getElementById('detail-roadview-link').href = `https://map.kakao.com/link/roadview/${lat},${lon}`;
+      document.getElementById('detail-roadview-link').href = `https://map.kakao.com/?map_type=TYPE_ROADVIEW&q=${lat},${lon}`;
       rwWrap.style.display = 'block';
     } else {
       rwWrap.style.display = 'none';
