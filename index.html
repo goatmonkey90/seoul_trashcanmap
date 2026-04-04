@@ -625,13 +625,25 @@
       border: 1px solid var(--border);
     }
 
-    /* ── 대시보드 배너 ── */
+    /* ── 패널 하단 (소개 + 배너) ── */
+    .panel-footer {
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      padding: 16px 20px 0;
+    }
+    .panel-about {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
     #dash-banner-link {
       display: block;
       position: relative;
       line-height: 0;
-      background: var(--dash-bg);
-      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
     }
     #dash-banner-link img {
       width: 100%;
@@ -720,14 +732,8 @@
 <!-- 지도 -->
 <div id="map"></div>
 
-<!-- 지도 위 대시보드 + 배너 -->
+<!-- 지도 위 대시보드 -->
 <div id="map-controls">
-<a id="dash-banner-link"
-   href="https://store.steampowered.com/app/3470500/Ember_and_Blade/?utm_source=trashcanmap&utm_medium=banner&utm_campaign=dashboard"
-   target="_blank" rel="noopener">
-  <img src="./emberandblade_banner.jpg" alt="Ember and Blade - Steam" />
-  <span class="dash-banner-label">AD</span>
-</a>
 <div id="map-dashboard">
   <div class="dash-item">
     <span class="dash-num" id="dash-total">-</span>
@@ -849,6 +855,16 @@
       <div class="detail-fields" id="detail-fields"></div>
     </div>
 
+  </div>
+
+  <div class="panel-footer">
+    <p class="panel-about">강남구·송파구 공공 쓰레기통 위치를 한눈에 확인하는 지도 서비스입니다.</p>
+    <a id="dash-banner-link"
+       href="https://store.steampowered.com/app/3470500/Ember_and_Blade/?utm_source=trashcanmap&utm_medium=banner&utm_campaign=dashboard"
+       target="_blank" rel="noopener">
+      <img src="./emberandblade_banner.jpg" alt="Ember and Blade - Steam" />
+      <span class="dash-banner-label">AD</span>
+    </a>
   </div>
 
 </div>
@@ -1097,6 +1113,7 @@
     if (markerCluster) { map.removeLayer(markerCluster); markerCluster = null; }
     markerCluster = L.markerClusterGroup({
       maxClusterRadius: 50,
+      spiderfyOnMaxZoom: false,
       iconCreateFunction(cluster) {
         const count = cluster.getChildCount();
         const size = count < 10 ? 36 : count < 50 ? 42 : 48;
