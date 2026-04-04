@@ -157,10 +157,11 @@
     }
 
     .stat-badge .num {
-      font-size: 18px;
+      font-size: clamp(13px, 4vw, 18px);
       font-weight: 800;
       color: var(--green);
       display: block;
+      white-space: nowrap;
     }
 
     .stat-badge .label {
@@ -788,7 +789,7 @@
         서울시 <strong id="info-districts">6개 자치구</strong>의
         공공 쓰레기통 위치를 한눈에 확인하세요.<br><br>
         핀을 클릭하면 <strong>상세 정보</strong>를 볼 수 있고,<br>
-        줌아웃하면 <strong>동 단위 현황</strong>이 표시됩니다.<br><br>
+        줌아웃하면 <strong>구 단위 현황</strong>이 표시됩니다.<br><br>
         📍 내 위치 버튼으로 <strong>가장 가까운 쓰레기통</strong>을 찾아보세요.
       </div>
 
@@ -1070,38 +1071,27 @@
     else showDefault();
   });
 
-  // ── 동 집계 레이어 ───────────────────────────────────
+  // ── 구 집계 레이어 ───────────────────────────────────
   function buildDongLayer() {
     if (dongLayer) { map.removeLayer(dongLayer); dongLayer = null; }
     dongLayer = L.layerGroup();
     for (const src of SOURCES) {
-      const groups = {};
-      for (const item of allData) {
-        if (item._src !== src) continue;
-        const match = (item._addr || '').match(/([가-힣]+동)/);
-        if (!match) continue;
-        const dong = match[1];
-        if (isNaN(item._lat) || isNaN(item._lon)) continue;
-        if (!groups[dong]) groups[dong] = { latSum: 0, lonSum: 0, count: 0 };
-        groups[dong].latSum += item._lat;
-        groups[dong].lonSum += item._lon;
-        groups[dong].count++;
-      }
-      for (const [dong, g] of Object.entries(groups)) {
-        const lat = g.latSum / g.count, lon = g.lonSum / g.count;
-        const icon = L.divIcon({
-          className: '',
-          html: `<div class="dong-bubble" style="background:${src.dongBg};">
-            <div class="d-name">${dong}</div>
-            <div class="d-count">🗑️ ${g.count}개</div>
-          </div>`,
-          iconSize: [0, 0],
-          iconAnchor: [0, 0],
-        });
-        const m = L.marker([lat, lon], { icon, zIndexOffset: 500 });
-        m.on('click', () => map.flyTo([lat, lon], DONG_THRESHOLD, { animate: true, duration: 0.5 }));
-        dongLayer.addLayer(m);
-      }
+      const items = allData.filter(d => d._src === src && !isNaN(d._lat) && !isNaN(d._lon));
+      if (!items.length) continue;
+      const lat = items.reduce((s, d) => s + d._lat, 0) / items.length;
+      const lon = items.reduce((s, d) => s + d._lon, 0) / items.length;
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="dong-bubble" style="background:${src.dongBg};">
+          <div class="d-name">${src.name}</div>
+          <div class="d-count">🗑️ ${items.length}개</div>
+        </div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
+      const m = L.marker([lat, lon], { icon, zIndexOffset: 500 });
+      m.on('click', () => map.flyTo([lat, lon], DONG_THRESHOLD, { animate: true, duration: 0.5 }));
+      dongLayer.addLayer(m);
     }
   }
 
