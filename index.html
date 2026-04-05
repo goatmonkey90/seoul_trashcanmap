@@ -893,16 +893,16 @@
       #panel.mobile-overview {
         transform: translateY(0);
       }
-      /* 상태 B: 핀 상세 — 헤더·검색 숨기고 스크롤 공간 최대화 */
+      /* 상태 B: 핀 상세 — 헤더·검색 숨기고 지도와 절반씩 공유 */
       #panel.mobile-detail {
         transform: translateY(0);
-        max-height: 80vh;
+        max-height: 50vh;
       }
       #panel.mobile-detail .panel-header,
       #panel.mobile-detail #search-bar,
       #panel.mobile-detail .panel-footer { display: none; }
       #panel.mobile-detail .panel-body {
-        max-height: calc(80vh - 24px);
+        max-height: calc(50vh - 24px);
       }
       .panel-header { padding: 0 16px 10px; border-bottom: 1px solid var(--border); }
       .panel-body {
@@ -1308,10 +1308,20 @@
     }
   }
 
-  // 모바일 핸들 토글
+  // 모바일 핸들 토글 + 스와이프 다운으로 감추기
   document.getElementById('mobile-handle').addEventListener('click', () => {
     if (window.innerWidth <= 680) setMobileState(mobileState === 'map-only' ? 'overview' : 'map-only');
   });
+  (function() {
+    const panel = document.getElementById('panel');
+    let touchStartY = 0;
+    panel.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+    panel.addEventListener('touchend', e => {
+      if (window.innerWidth > 680) return;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (dy > 60) setMobileState('map-only'); // 60px 이상 아래로 쓸면 감춤
+    }, { passive: true });
+  })();
 
   // ── 뷰 전환 ──────────────────────────────────────────
   function showList(items, title) {
@@ -1403,7 +1413,7 @@
     if (isMobile) {
       setMobileState('detail');
       if (!isNaN(lat) && !isNaN(lon)) {
-        const panelH = window.innerHeight * 0.80;
+        const panelH = window.innerHeight * 0.50;
         const offsetY = Math.round(panelH / 2);
         map.panTo([lat, lon], { animate: true });
         map.panBy([0, offsetY], { animate: false });
