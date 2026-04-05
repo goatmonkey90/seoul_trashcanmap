@@ -835,25 +835,62 @@
     }
 
     /* 모바일 */
+    /* ── 핀 하이라이트 ── */
+    .pin-highlight {
+      width: 26px; height: 26px;
+      border: 3px solid #e53935;
+      border-radius: 50%;
+      background: rgba(229,57,53,0.15);
+      box-shadow: 0 0 0 5px rgba(229,57,53,0.2);
+      animation: pin-pulse 1.6s ease-out infinite;
+    }
+    @keyframes pin-pulse {
+      0%   { box-shadow: 0 0 0 0   rgba(229,57,53,0.4); }
+      70%  { box-shadow: 0 0 0 10px rgba(229,57,53,0); }
+      100% { box-shadow: 0 0 0 0   rgba(229,57,53,0); }
+    }
+    /* ── 핀 위치로 버튼 ── */
+    #btn-goto-pin {
+      display: none;
+      margin-top: 8px; width: 100%; padding: 8px;
+      background: var(--green-pale); color: var(--green);
+      border: 1px solid var(--green); border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer; text-align: center;
+    }
+    #btn-goto-pin:hover { background: var(--green); color: white; }
+    /* ── 모바일 ── */
     @media (max-width: 680px) {
       :root { --panel-w: 0px; }
-
-      #map {
-        width: 100vw;
-        height: 60vh;
-        top: 0;
+      #map { width: 100vw; height: 100vh; }
+      #panel-toggle { display: none; }
+      .mobile-handle {
+        display: flex; justify-content: center; align-items: center;
+        height: 24px; cursor: pointer; flex-shrink: 0;
       }
-
+      .mobile-handle::before {
+        content: ''; width: 40px; height: 4px;
+        background: var(--border-strong); border-radius: 2px;
+      }
       #panel {
-        top: 60vh;
-        width: 100vw;
-        height: 40vh;
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
+        top: auto; bottom: 0; left: 0; right: 0;
+        width: 100vw; height: auto;
+        max-height: 55vh;
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+        transform: translateY(calc(100% - 52px));
+        transition: transform 0.32s ease;
+        overflow: hidden;
       }
-
-      .panel-logo { margin-bottom: 8px; }
-      .panel-header { padding: 14px 16px 10px; }
-      .panel-body { padding: 10px 16px; }
+      #panel.mobile-open {
+        transform: translateY(0);
+      }
+      .panel-header { padding: 0 16px 10px; border-bottom: 1px solid var(--border); }
+      .panel-body {
+        overflow-y: auto;
+        max-height: calc(55vh - 130px);
+        padding: 10px 16px;
+      }
+      .panel-footer { flex-shrink: 0; }
     }
   </style>
 </head>
@@ -889,6 +926,7 @@
 
 <!-- 사이드 패널 -->
 <div id="panel">
+  <div class="mobile-handle" id="mobile-handle"></div>
   <div class="panel-header">
     <div class="panel-logo">
       <div class="panel-logo-icon">🗑️</div>
@@ -983,6 +1021,7 @@
       </div>
 
       <div class="detail-fields" id="detail-fields"></div>
+      <button id="btn-goto-pin">🎯 핀 위치로 이동</button>
       <button class="error-report-btn" id="error-report-btn">⚠️ 이 핀의 오류 제보하기</button>
     </div>
 
@@ -1193,9 +1232,10 @@
   applyTheme(activeTheme);  // 타일 URL 반영
 
   // ── 상태 ─────────────────────────────────────────────
-  let allData          = [];
-  let markerCluster    = null;
+  let allData           = [];
+  let markerCluster     = null;
   let currentDetailItem = null;
+  let highlightMarker   = null;
   let dongLayer     = null;
   let myMarker      = null;
   let userLatLng    = null;
@@ -1216,12 +1256,20 @@
   // ── 패널 자동 펼치기 ─────────────────────────────────
   const panelToggleBtn = document.getElementById('panel-toggle');
   function expandPanel() {
-    if (document.body.classList.contains('panel-collapsed')) {
+    if (window.innerWidth <= 680) {
+      document.getElementById('panel').classList.add('mobile-open');
+    } else if (document.body.classList.contains('panel-collapsed')) {
       document.body.classList.remove('panel-collapsed');
       panelToggleBtn.textContent = '▶';
       setTimeout(() => map && map.invalidateSize(), 360);
     }
   }
+
+  // 모바일 핸들 토글
+  document.getElementById('mobile-handle').addEventListener('click', () => {
+    const panel = document.getElementById('panel');
+    panel.classList.toggle('mobile-open');
+  });
 
   // ── 뷰 전환 ──────────────────────────────────────────
   function showList(items, title) {
@@ -1291,10 +1339,38 @@
     } else {
       rwWrap.style.display = 'none';
     }
+
+    // 하이라이트 마커
+    if (highlightMarker) { map.removeLayer(highlightMarker); highlightMarker = null; }
+    if (!isNaN(lat) && !isNaN(lon)) {
+      highlightMarker = L.marker([lat, lon], {
+        icon: L.divIcon({ html: '<div class="pin-highlight"></div>', className: '', iconSize: [26, 26], iconAnchor: [13, 13] }),
+        zIndexOffset: 2000, interactive: false,
+      }).addTo(map);
+    }
+
+    // 모바일: 패널 열기 + 핀을 화면 상단 절반 중앙에 배치
+    const isMobile = window.innerWidth <= 680;
+    if (isMobile) {
+      document.getElementById('panel').classList.add('mobile-open');
+      if (!isNaN(lat) && !isNaN(lon)) {
+        const panelH = window.innerHeight * 0.55;
+        const offsetY = Math.round(panelH / 2);
+        map.panTo([lat, lon], { animate: true });
+        map.panBy([0, offsetY], { animate: false });
+      }
+    }
+
+    // 핀 위치로 버튼 초기 상태
+    document.getElementById('btn-goto-pin').style.display = 'none';
   }
 
   function showDefault() {
     listContext = null;
+    currentDetailItem = null;
+    if (highlightMarker) { map.removeLayer(highlightMarker); highlightMarker = null; }
+    document.getElementById('btn-goto-pin').style.display = 'none';
+    if (window.innerWidth <= 680) document.getElementById('panel').classList.remove('mobile-open');
     document.getElementById('view-default').style.display = 'block';
     document.getElementById('view-detail').style.display  = 'none';
     document.getElementById('view-list').style.display    = 'none';
@@ -1548,7 +1624,18 @@
   }
   const debouncedDashboard = debounce(updateDashboard, 150);
   map.on('zoomend', () => { updateLayers(); debouncedDashboard(); });
-  map.on('moveend', debouncedDashboard);
+  map.on('moveend', () => {
+    debouncedDashboard();
+    if (currentDetailItem && !isNaN(currentDetailItem._lat)) {
+      const inView = map.getBounds().contains([currentDetailItem._lat, currentDetailItem._lon]);
+      document.getElementById('btn-goto-pin').style.display = inView ? 'none' : 'block';
+    }
+  });
+
+  document.getElementById('btn-goto-pin').addEventListener('click', () => {
+    if (!currentDetailItem) return;
+    map.flyTo([currentDetailItem._lat, currentDetailItem._lon], Math.max(map.getZoom(), 17), { animate: true, duration: 0.6 });
+  });
 
   // ── 데이터 로드 ──────────────────────────────────────
   async function loadData() {
