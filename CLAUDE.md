@@ -12,15 +12,29 @@
 - **다크모드**: CSS filter (`invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9)`)
 - **단일 파일**: `index.html`에 HTML/CSS/JS 모두 포함
 - **데이터**: `data.json` (빌드 스크립트: `build_data.py`)
+- **모바일 브레이크포인트**: `680px` (max-width: 680px = 모바일)
 
 ## 데이터 파이프라인
 
 ### 현재 구조 (data.json)
-- 서울 25개 자치구, 2,917건 (2023.12 기준)
+- 서울 25개 자치구, 2,917건 (2023.12 기준, 수동 수정 포함)
 - 중복 제거 완료: 같은 위치의 일반/재활용쓰레기는 한 건으로 합침 (`kind: "일반쓰레기 + 재활용쓰레기"`)
 - 좌표 출처:
   - `csv_official` (357건): 전국휴지통표준데이터 CSV의 GPS 좌표
   - `vworld` (2,560건): Vworld API 지오코딩
+  - `manual` (소수): 수동으로 좌표를 직접 입력한 핀
+
+### 수동 수정된 핀 (geocode=manual)
+| 핀 ID | 내용 |
+|-------|------|
+| 0727 | 노원구, 수동 좌표 수정 |
+| 1162 | 노원구, 수동 좌표 수정 |
+| 1415 | 서초구, 수동 좌표 수정 |
+| 0011 | 강동구, 수동 좌표 수정 (kko.to/XDqx6S9bgX) |
+| 1684 | 종로구 서순라길 인근, 수동 좌표 수정 |
+| 1685 | 종로구 서순라길 7, 수동 좌표 수정 |
+| 1686 | 종로구 서순라길 3, 수동 좌표 수정 |
+| 1606 | **삭제됨** — 현장에 쓰레기통 없음 |
 
 ### 원본 데이터 파일
 | 파일 | 용도 |
@@ -58,9 +72,63 @@ python build_data.py
 - **view-list**: 클러스터 클릭시 목록
 - **view-detail**: 개별 쓰레기통 상세 (카카오 로드뷰 링크 포함)
 
+### 모바일 3-state 패널 시스템
+CSS 클래스로 상태 관리 (`setMobileState(state)` 함수):
+- **map-only** (클래스 없음): 패널 완전히 숨김 (`translateY(100%)`)
+- **mobile-overview**: 패널 55vh, 헤더·검색바·footer 표시
+- **mobile-detail**: 패널 50vh 최대, 헤더·검색바·footer 숨김, body만 스크롤
+
+패널 동작:
+- 지도 클릭: map-only ↔ overview 토글, 상세정보 중엔 showDefault()
+- 스와이프 다운 (dy > 60px): 패널 숨김(map-only)
+- 핀 선택: mobile-detail 전환 + `panBy(panelH * 0.75)` 오프셋으로 핀 화면 상단 1/4에 위치
+
+### 출처·배너 표시 방식 (이중 구조)
+- **`.panel-footer`**: 데스크톱에서 패널 하단 고정 노출
+- **`.detail-footer-scroll`**: 모바일에서 상세정보 스크롤 내부 포함
+- `@media (min-width: 681px)` 에서 `.detail-footer-scroll { display: none; }` → 데스크톱 중복 방지
+- `#panel.mobile-detail .panel-footer { display: none; }` → 모바일 detail 시 footer 숨김
+
+### 핀 강조 방식
+- `renderMarkers()`에서 `item._marker = marker` 저장
+- 선택 시: `marker.setIcon(highlightIcon)`, 원본 `marker._origIcon`에 저장
+- 해제 시: `marker.setIcon(marker._origIcon)` 복원
+- 클러스터 안에 있는 핀 (`!item._marker._icon`): `markerCluster.zoomToShowLayer(item._marker)` 호출
+
 ### 대시보드
 - 지도 위 상단: 전체/현재 화면 카운트 + 테마 토글
 - 사이드 패널: 전체 개수, 자치구 수, 내 위치 거리
+
+## admin.html 구조
+
+### 탭 목록
+- **submissions**: 신고 접수 (Firestore `submissions` 컬렉션)
+- **approved / rejected**: 처리 완료 신고
+- **review**: 좌표 검수 (review_data.json 기반 BAD/SUSPECT 핀)
+- **pin-search**: 핀 수정 (전체 핀 검색 후 kko.to 제출)
+
+### Firestore 연동
+- **프로젝트**: `seoul-cleanmap`
+- **컬렉션**: `submissions` (신고), `coord_reviews` (좌표 수정 제출)
+- `coord_reviews` 문서 구조: `{ pinId, kkoTo, status:'pending', district, label, road, curLat, curLon, submittedAt }`
+- Firestore REST API: `https://firestore.googleapis.com/v1/projects/seoul-cleanmap/databases/(default)/documents/coord_reviews`
+
+### review_data.json
+- 생성: `tools/verify_geocode.py` → `verify_result.csv` → `tools/build_review_data.py` → `review_data.json`
+- BAD(500m+), SUSPECT(200-500m) 핀만 포함
+- `geocode=manual` 핀 제외 (이미 수동 수정됨)
+- 현재 약 130건
+- 핀 ID 매칭: label + road + district 기준 (좌표는 수정될 수 있으므로)
+
+### 좌표 검수 워크플로우
+1. 사용자가 admin.html → 좌표 검수 탭에서 kko.to 링크 확인 후 제출
+2. Firestore `coord_reviews`에 저장됨
+3. 사용자가 Claude에게 반영 요청 (admin 하단 "📋 Claude에게 반영 요청 복사" 버튼으로 텍스트 복사)
+4. Claude가 Firestore REST API로 pending 항목 조회 → kko.to 링크 resolve → data.json 수정
+5. 수정 후 `geocode=manual`로 변경, review_data.json 재생성, commit+push
+
+### 로드뷰 URL 형식
+`https://map.kakao.com/link/roadview/${lat},${lon}`
 
 ## 사용자 규칙
 
@@ -73,6 +141,7 @@ python build_data.py
 - 중복 핀 배치 금지 — 같은 위치에 동일 내용의 핀이 여러 개 찍히면 안 됨
 - 배너(Ember and Blade)는 패널 하단, about 텍스트 위에 배치, 너비는 패널에 맞추고 높이는 잘리지 않게
 - 로드뷰 URL: `https://map.kakao.com/link/roadview/${lat},${lon}`
+- review_data.json 재생성 시 `geocode=manual` 핀은 항상 제외할 것
 
 ### 삭제 가능한 파일
 - `regeocode.py`, `regeocode2.py` — 과거 지오코딩 스크립트, 더 이상 불필요
@@ -83,3 +152,5 @@ python build_data.py
 - [ ] 공공데이터포털 API 승인 후 강남구·송파구 공식 좌표로 교체
 - [ ] git remote를 새 org URL로 업데이트 (`seoul-cleanmap/seoul-cleanmap.github.io`)
 - [ ] 데이터 업데이트 시 build_data.py 재실행 필요
+- [ ] 좌표 검수 진행 중 — BAD 핀 위주로 kko.to 제출 후 Claude에게 반영 요청
+- [ ] verify_geocode.py 결과: OK=253, BAD=116, SUSPECT=18, NOT_FOUND=1593 (vworld 1980건 기준)
