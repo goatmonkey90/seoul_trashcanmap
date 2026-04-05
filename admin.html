@@ -359,12 +359,25 @@
   let markerKakao = null;
 
   async function loadReview() {
-    // Firestore에서 이미 제출된 항목 파악
-    const snap = await db.collection('coord_reviews').get();
-    doneIds = new Set(snap.docs.map(d => d.data().pinId));
+    document.getElementById('list-pane').innerHTML = '<div class="list-empty">로딩 중...</div>';
+    // Firestore 제출 이력 (컬렉션 없어도 무시)
+    try {
+      const snap = await db.collection('coord_reviews').get();
+      doneIds = new Set(snap.docs.map(d => d.data().pinId));
+    } catch(e) { doneIds = new Set(); }
 
-    const res = await fetch('./review_data.json');
-    reviewItems = await res.json();
+    // review_data.json — 배포 URL 기준 절대 경로로 시도
+    try {
+      const base = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+        ? '' : '';
+      const res = await fetch(base + '/review_data.json');
+      if (!res.ok) throw new Error(res.status);
+      reviewItems = await res.json();
+    } catch(e) {
+      document.getElementById('list-pane').innerHTML =
+        `<div class="list-empty" style="color:#e53935;">review_data.json 로드 실패<br><small>${e}</small></div>`;
+      return;
+    }
     document.getElementById('badge-review').textContent =
       reviewItems.filter(r => r.status === 'BAD' && !doneIds.has(r.id)).length;
     renderReview();
