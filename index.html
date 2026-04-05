@@ -1354,6 +1354,10 @@
       item._marker._origIcon = item._marker.options.icon;
       item._marker.setIcon(glowIcon);
       highlightMarker = item._marker;
+      // 클러스터 안에 있으면(개별 아이콘 DOM 없음) 줌인해서 노출
+      if (!item._marker._icon && markerCluster) {
+        markerCluster.zoomToShowLayer(item._marker);
+      }
     }
 
     // 모바일: 패널 열기 + 핀을 화면 상단 절반 중앙에 배치
