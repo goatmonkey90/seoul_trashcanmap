@@ -1344,13 +1344,16 @@
       rwWrap.style.display = 'none';
     }
 
-    // 하이라이트 마커
-    if (highlightMarker) { map.removeLayer(highlightMarker); highlightMarker = null; }
-    if (!isNaN(lat) && !isNaN(lon)) {
-      highlightMarker = L.marker([lat, lon], {
-        icon: L.divIcon({ html: `<img src="${CUSTOM_ICON_URL}" class="pin-glow-img">`, className: '', iconSize: [36, 36], iconAnchor: [18, 36] }),
-        zIndexOffset: 2000, interactive: false,
-      }).addTo(map);
+    // 하이라이트: 이전 마커 아이콘 복원 후 새 마커에 글로우 아이콘 교체
+    if (highlightMarker) { highlightMarker.setIcon(highlightMarker._origIcon); highlightMarker = null; }
+    if (!isNaN(lat) && !isNaN(lon) && item._marker) {
+      const glowIcon = L.divIcon({
+        html: `<img src="${CUSTOM_ICON_URL}" class="pin-glow-img" style="display:block;width:36px;height:36px;">`,
+        className: '', iconSize: [36, 36], iconAnchor: [18, 36],
+      });
+      item._marker._origIcon = item._marker.options.icon;
+      item._marker.setIcon(glowIcon);
+      highlightMarker = item._marker;
     }
 
     // 모바일: 패널 열기 + 핀을 화면 상단 절반 중앙에 배치
@@ -1372,7 +1375,7 @@
   function showDefault() {
     listContext = null;
     currentDetailItem = null;
-    if (highlightMarker) { map.removeLayer(highlightMarker); highlightMarker = null; }
+    if (highlightMarker) { highlightMarker.setIcon(highlightMarker._origIcon); highlightMarker = null; }
     document.getElementById('btn-goto-pin').style.display = 'none';
     if (window.innerWidth <= 680) document.getElementById('panel').classList.remove('mobile-open');
     document.getElementById('view-default').style.display = 'block';
@@ -1464,6 +1467,7 @@
       });
       const marker = L.marker([lat, lon], { icon, zIndexOffset: isHL ? 1000 : 0, title: item._addr || '' });
       marker._trashItem = item;
+      item._marker = marker;
       marker.on('click', () => {
         expandPanel();
         showDetail(item);
