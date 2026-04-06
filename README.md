@@ -3,6 +3,7 @@
 서울시 25개 자치구 공공 쓰레기통 위치를 지도로 표시하는 정적 웹앱.
 
 **배포 주소**: https://seoul-cleanmap.github.io
+**관리자 페이지**: https://seoul-cleanmap.github.io/admin.html
 
 ---
 
