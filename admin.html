@@ -209,6 +209,9 @@
     <div class="tab" data-tab="pin-search">
       핀 수정
     </div>
+    <div class="tab" data-tab="correction-log">
+      수정 이력 <span class="badge" id="badge-corrections" style="background:#607d8b;">0</span>
+    </div>
   </div>
   <div class="admin-body">
     <div class="list-pane" id="list-pane">
@@ -435,6 +438,8 @@
           loadReview();
         } else if (currentTab === 'pin-search') {
           loadPinSearch();
+        } else if (currentTab === 'correction-log') {
+          loadCorrectionLog();
         } else {
           document.getElementById('report-actions').style.display = 'block';
           document.getElementById('review-actions').style.display = 'none';
@@ -601,6 +606,20 @@
         try {
           await applyGitHubUpdate(item.pinId, correctedCoords.lat, correctedCoords.lon);
           statusEl.textContent = '✅ data.json 업데이트 완료! Firestore 처리 중...';
+          // 수정 이력 로그 저장
+          await db.collection('pin_corrections').add({
+            pinId: String(item.pinId),
+            pinLabel: item.pinLabel || '',
+            district: item.district || '',
+            road: item.road || '',
+            oldLat: item.lat || null,
+            oldLon: item.lon || null,
+            newLat: correctedCoords.lat,
+            newLon: correctedCoords.lon,
+            kkoTo: document.getElementById('lf-kakao-url').value.trim() || null,
+            note: '오류제보 승인',
+            correctedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
           await db.collection(col).doc(item.id).update({ status: 'approved' });
           document.getElementById('detail-pane').style.display = 'none';
           selectedId = null;
@@ -837,6 +856,76 @@
     // submitCorrection에 넘길 수 있도록 형식 맞춤
     const item = { id: p.id, district: p.district, label: p.label, road: p.road, cur_lat: p.lat, cur_lon: p.lon };
     document.getElementById('rv-submit-btn').onclick = () => submitCorrection(item);
+  }
+
+  // ── 수정 이력 탭 ─────────────────────────────────────
+  async function loadCorrectionLog() {
+    const pane = document.getElementById('list-pane');
+    document.getElementById('report-actions').style.display = 'none';
+    document.getElementById('review-actions').style.display = 'none';
+    document.getElementById('detail-pane').style.display = 'none';
+    pane.innerHTML = '<div class="list-empty">로딩 중...</div>';
+
+    // data.json에서 geocode=manual 핀 목록 가져오기
+    let manualPins = [];
+    try {
+      if (!allPins.length) {
+        const res = await fetch('/data.json');
+        allPins = await res.json();
+      }
+      manualPins = allPins.filter(p => p.geocode === 'manual');
+    } catch(e) {}
+
+    // Firestore pin_corrections 이력
+    let logEntries = [];
+    try {
+      const snap = await db.collection('pin_corrections').orderBy('correctedAt', 'desc').get();
+      logEntries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) { /* 컬렉션 없으면 무시 */ }
+
+    // pin_corrections에 있는 pinId 셋
+    const loggedIds = new Set(logEntries.map(e => String(e.pinId)));
+
+    document.getElementById('badge-corrections').textContent = manualPins.length;
+
+    pane.innerHTML = `
+      <div style="padding:10px 14px;border-bottom:1px solid #eee;font-size:12px;color:#555;">
+        수동 수정된 핀 <strong>${manualPins.length}개</strong>
+        (geocode=manual 기준)
+      </div>`;
+
+    if (!manualPins.length) {
+      pane.innerHTML += '<div class="list-empty">수동 수정 핀 없음</div>';
+      return;
+    }
+
+    manualPins.forEach(p => {
+      const logs = logEntries.filter(e => String(e.pinId) === String(p.id));
+      const div = document.createElement('div');
+      div.className = 'report-item' + (p.id === selectedId ? ' selected' : '');
+      div.innerHTML = `
+        <div class="ri-label">No.${p.id} · ${p.label || '-'}</div>
+        <div class="ri-sub">${p.district || ''} · ${p.road || ''}</div>
+        <div style="font-size:11px;color:#888;margin-top:3px;">
+          ${p.lat?.toFixed(6)}, ${p.lon?.toFixed(6)}
+          ${logs.length ? `<span style="color:#2e7d52;margin-left:6px;">✅ 이력 ${logs.length}건</span>` : ''}
+        </div>
+        ${logs.map(l => `
+          <div style="font-size:11px;background:#f5f5f5;border-radius:6px;padding:4px 8px;margin-top:4px;color:#555;">
+            ${fmtTime(l.correctedAt)} · ${l.note || '좌표 수정'}
+            ${l.kkoTo ? `<a href="${l.kkoTo}" target="_blank" style="color:#1565c0;margin-left:4px;">kko.to</a>` : ''}
+          </div>`).join('')}`;
+      div.addEventListener('click', () => {
+        selectedId = p.id;
+        if (markerCur) { adminMap.removeLayer(markerCur); markerCur = null; }
+        if (markerCorrect) { adminMap.removeLayer(markerCorrect); markerCorrect = null; }
+        markerCur = L.marker([p.lat, p.lon], {
+          icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#2e7d52;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className:'', iconSize:[14,14], iconAnchor:[7,7] })
+        }).addTo(adminMap).bindPopup(`No.${p.id} · ${p.label}<br>수동 수정됨`).openPopup();
+        adminMap.setView([p.lat, p.lon], 17);
+      });
+      pane.appendChild(div);
+    });
   }
 
   // ── Claude 반영 요청 클립보드 복사 버튼 ──────────────
