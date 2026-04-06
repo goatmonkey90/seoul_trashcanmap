@@ -210,9 +210,9 @@
       핀 수정
     </div>
     <div class="tab" data-tab="correction-log">
-      수정 이력 <span class="badge" id="badge-corrections" style="background:#607d8b;">0</span>
+      전체 핀 <span class="badge" id="badge-corrections" style="background:#607d8b;">0</span>
     </div>
-    <button id="claude-copy-btn" style="margin-left:auto;margin-right:8px;align-self:center;padding:5px 12px;background:#1a3a2a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📋 Claude에게 반영 요청 복사</button>
+    <button id="claude-copy-btn" style="margin-left:auto;margin-right:8px;align-self:center;padding:5px 12px;background:#1a3a2a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📋 수정 요청 복사 <span id="pending-badge" style="display:none;background:#e65100;color:white;font-size:10px;padding:1px 5px;border-radius:8px;margin-left:3px;">0</span></button>
   </div>
   <div class="admin-body">
     <div class="list-pane" id="list-pane">
@@ -241,11 +241,20 @@
           </div>
           <div id="approve-status" style="font-size:12px;color:#2e7d52;margin-top:6px;min-height:16px;"></div>
         </div>
-        <!-- 수정 이력 표시 (수정 이력 탭) -->
+        <!-- 수정 이력 표시 (전체 핀 탭) -->
         <div id="log-actions" style="display:none;">
           <div id="log-history"></div>
-          <div style="margin-top:10px;">
+          <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
             <a id="log-map-link" href="#" target="_blank" class="rv-link">지도에서 보기</a>
+            <a id="log-roadview-link" href="#" target="_blank" class="rv-link">카카오 로드뷰</a>
+          </div>
+          <div class="lf-section" style="margin-top:10px;">
+            <label>수정 예약 (kko.to)</label>
+            <div class="lf-input-row">
+              <input type="url" id="log-kko-input" placeholder="https://kko.to/...">
+              <button class="lf-preview-btn" id="log-reserve-btn" style="background:#e65100;">예약</button>
+            </div>
+            <div id="log-pending-msg" style="font-size:11px;margin-top:4px;min-height:14px;"></div>
           </div>
         </div>
         <!-- 좌표 검수 액션 -->
@@ -866,7 +875,20 @@
     document.getElementById('rv-submit-btn').onclick = () => submitCorrection(item);
   }
 
-  // ── 수정 이력 탭 ─────────────────────────────────────
+  // ── 수정 예약 (localStorage) ──────────────────────────
+  let pendingCorrections = {};
+  try { pendingCorrections = JSON.parse(localStorage.getItem('pending_corrections') || '{}'); } catch(e) {}
+
+  function savePending() {
+    localStorage.setItem('pending_corrections', JSON.stringify(pendingCorrections));
+    const count = Object.keys(pendingCorrections).length;
+    const badge = document.getElementById('pending-badge');
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline' : 'none';
+  }
+  savePending(); // 초기 뱃지 반영
+
+  // ── 전체 핀 탭 ───────────────────────────────────────
   let clLogEntries = []; // Firestore pin_corrections 캐시
 
   async function loadCorrectionLog() {
@@ -894,8 +916,7 @@
       clLogEntries = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
     } catch(e) { clLogEntries = []; }
 
-    const manualCount = allPins.filter(p => p.geocode === 'manual').length;
-    document.getElementById('badge-corrections').textContent = manualCount;
+    document.getElementById('badge-corrections').textContent = allPins.length.toLocaleString();
 
     renderCorrectionList(allPins, '');
   }
@@ -910,16 +931,17 @@
           (p.district && p.district.includes(query)))
       : pins;
 
-    const manualSet = new Set(pins.filter(p => p.geocode === 'manual').map(p => p.id));
-    const logSet    = new Set(clLogEntries.map(e => String(e.pinId)));
+    const manualCount = pins.filter(p => p.geocode === 'manual').length;
+    const pendingCount = Object.keys(pendingCorrections).length;
 
     pane.innerHTML = `
       <div class="ps-search-wrap">
         <input type="search" id="cl-input" placeholder="번호·장소명·도로명·자치구 검색..." value="${query}">
       </div>
-      <div style="padding:6px 14px 4px;font-size:11px;color:#aaa;">
-        전체 ${filtered.length.toLocaleString()}개
-        · 수동수정 ${manualSet.size}개
+      <div style="padding:5px 14px 6px;font-size:11px;color:#888;border-bottom:1px solid #f0f0f0;">
+        ${query ? `검색결과 <strong>${filtered.length.toLocaleString()}</strong>개 / ` : ''}전체 <strong>${pins.length.toLocaleString()}</strong>개
+        &nbsp;·&nbsp; 수정됨 <strong style="color:#2e7d52;">${manualCount}</strong>개
+        ${pendingCount > 0 ? `&nbsp;·&nbsp; 예약 <strong style="color:#e65100;">${pendingCount}</strong>개` : ''}
       </div>`;
 
     document.getElementById('cl-input').addEventListener('input', e => {
@@ -929,6 +951,7 @@
     const frag = document.createDocumentFragment();
     filtered.slice(0, 200).forEach(p => {
       const isManual = p.geocode === 'manual';
+      const isPending = !!pendingCorrections[p.id];
       const logs = clLogEntries.filter(e => String(e.pinId) === String(p.id));
       const div = document.createElement('div');
       div.className = 'report-item' + (p.id === selectedId ? ' selected' : '');
@@ -937,6 +960,7 @@
           ${isManual
             ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#e8f5ee;color:#2e7d52;">수정됨</span>'
             : '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#f5f5f5;color:#aaa;">미수정</span>'}
+          ${isPending ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#fff3e0;color:#e65100;">예약됨</span>' : ''}
           ${logs.length ? `<span style="font-size:10px;color:#1565c0;">이력 ${logs.length}건</span>` : ''}
         </div>
         <div class="ri-label" style="margin-top:3px;">No.${p.id} · ${p.label || '-'}</div>
@@ -987,6 +1011,34 @@
 
     document.getElementById('log-map-link').href =
       `https://map.kakao.com/link/map/${encodeURIComponent(p.label)},${p.lat},${p.lon}`;
+    document.getElementById('log-roadview-link').href =
+      `https://map.kakao.com/link/roadview/${p.lat},${p.lon}`;
+
+    // 예약 입력 초기화
+    const kkoInput = document.getElementById('log-kko-input');
+    const pendingMsg = document.getElementById('log-pending-msg');
+    kkoInput.value = pendingCorrections[p.id]?.kkoTo || '';
+    pendingMsg.style.color = '#e65100';
+    pendingMsg.textContent = pendingCorrections[p.id] ? `예약됨: ${pendingCorrections[p.id].kkoTo}` : '';
+
+    document.getElementById('log-reserve-btn').onclick = () => {
+      const val = kkoInput.value.trim();
+      if (!val.startsWith('http')) {
+        pendingMsg.style.color = '#e53935';
+        pendingMsg.textContent = 'kko.to 링크를 입력해주세요.';
+        return;
+      }
+      if (val) {
+        pendingCorrections[p.id] = { label: p.label, district: p.district, kkoTo: val };
+        pendingMsg.style.color = '#e65100';
+        pendingMsg.textContent = `✅ 예약됨: ${val}`;
+      } else {
+        delete pendingCorrections[p.id];
+        pendingMsg.textContent = '';
+      }
+      savePending();
+      renderCorrectionList(allPins, document.getElementById('cl-input')?.value?.trim().toLowerCase() || '');
+    };
 
     const histEl = document.getElementById('log-history');
     if (!logs.length) {
@@ -1005,9 +1057,18 @@
   }
 
   document.getElementById('claude-copy-btn').addEventListener('click', function() {
-    navigator.clipboard.writeText('Firestore coord_reviews에 pending 건 전부 반영해줘').then(() => {
-      this.textContent = '✅ 복사됨';
-      setTimeout(() => { this.textContent = '📋 Claude에게 반영 요청 복사'; }, 2000);
+    const entries = Object.entries(pendingCorrections);
+    let text;
+    if (entries.length > 0) {
+      const lines = entries.map(([id, v]) => `${id}: ${v.kkoTo}  (${v.label})`).join('\n');
+      text = `다음 핀들 좌표 수정해줘:\n${lines}`;
+    } else {
+      text = 'Firestore coord_reviews에 pending 건 전부 반영해줘';
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      const prev = this.innerHTML;
+      this.innerHTML = '✅ 복사됨';
+      setTimeout(() => { this.innerHTML = prev; }, 2000);
     });
   });
 </script>
