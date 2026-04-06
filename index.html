@@ -1667,7 +1667,7 @@
   // ── 데이터 로드 ──────────────────────────────────────
   async function loadData() {
     try {
-      const rows = await fetch('./data.json').then(r => r.json());
+      const rows = await fetch('./data.json', { cache: 'no-cache' }).then(r => r.json());
       const srcByName = Object.fromEntries(SOURCES.map(s => [s.name, s]));
       allData = rows.map(row => {
         let src = srcByName[row.district];
