@@ -212,6 +212,7 @@
     <div class="tab" data-tab="correction-log">
       수정 이력 <span class="badge" id="badge-corrections" style="background:#607d8b;">0</span>
     </div>
+    <button id="claude-copy-btn" style="margin-left:auto;margin-right:8px;align-self:center;padding:5px 12px;background:#1a3a2a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📋 Claude에게 반영 요청 복사</button>
   </div>
   <div class="admin-body">
     <div class="list-pane" id="list-pane">
@@ -1003,19 +1004,12 @@
     document.getElementById('detail-pane').style.display = 'block';
   }
 
-  // ── Claude 반영 요청 클립보드 복사 버튼 ──────────────
-  (function() {
-    const btn = document.createElement('button');
-    btn.textContent = '📋 Claude에게 반영 요청 복사';
-    btn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:9999;padding:10px 16px;background:#1a3a2a;color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.2);';
-    btn.addEventListener('click', () => {
-      navigator.clipboard.writeText('Firestore coord_reviews에 pending 건 전부 반영해줘').then(() => {
-        btn.textContent = '✅ 복사됨';
-        setTimeout(() => { btn.textContent = '📋 Claude에게 반영 요청 복사'; }, 2000);
-      });
+  document.getElementById('claude-copy-btn').addEventListener('click', function() {
+    navigator.clipboard.writeText('Firestore coord_reviews에 pending 건 전부 반영해줘').then(() => {
+      this.textContent = '✅ 복사됨';
+      setTimeout(() => { this.textContent = '📋 Claude에게 반영 요청 복사'; }, 2000);
     });
-    document.body.appendChild(btn);
-  })();
+  });
 </script>
 </body>
 </html>
